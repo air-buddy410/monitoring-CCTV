@@ -14,6 +14,7 @@ import { AppError, rateLimited } from "./errors";
 import { createLogger } from "./logger";
 import { createRateLimiter, type RateLimiter } from "./rate-limit";
 import { createReadiness, type Readiness } from "./readiness";
+import { agentRoutes } from "./routes/agents";
 import { auditRoutes } from "./routes/audit";
 import { deviceRoutes } from "./routes/devices";
 import { grantRoutes } from "./routes/grants";
@@ -80,6 +81,7 @@ export async function buildApp(opts: {
       },
       tags: [
         { name: "health" },
+        { name: "agents" },
         { name: "sites" },
         { name: "devices" },
         { name: "grants" },
@@ -194,6 +196,7 @@ export async function buildApp(opts: {
   deviceRoutes(app, deps);
   snapshotRoutes(app, deps);
   grantRoutes(app, deps);
+  agentRoutes(app, deps);
   auditRoutes(app, deps);
 
   app.withTypeProvider<ZodTypeProvider>();

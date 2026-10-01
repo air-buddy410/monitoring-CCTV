@@ -154,6 +154,50 @@ export const GrantQuery = z.object({
   scopeId: z.string().min(1).max(100).optional(),
 });
 
+// ---- agents (PRD section 8 and 9.1/9.2) ----
+export const AGENT_STATUSES = ["pending", "online", "offline", "revoked"] as const;
+export const AgentStatus = z.enum(AGENT_STATUSES);
+export type AgentStatus = z.infer<typeof AgentStatus>;
+
+/** An enrollment is created by owner/noc for one site; it yields a single-use token with a TTL. */
+export const AgentEnrollmentCreate = z
+  .object({
+    siteId: z.string().min(1).max(100),
+    name: z.string().trim().min(1).max(120),
+    ttlMinutes: z.number().int().min(1).max(1440).default(60),
+  })
+  .strict();
+export type AgentEnrollmentCreate = z.infer<typeof AgentEnrollmentCreate>;
+/** The token is shown once and never stored in clear; it is not part of the persisted record. */
+export const AgentEnrollmentCreated = z.object({
+  id: z.string(),
+  siteId: z.string(),
+  token: z.string(),
+  expiresAt: z.string(),
+});
+export const Agent = z.object({
+  id: z.string(),
+  siteId: z.string(),
+  name: z.string(),
+  version: z.string(),
+  status: AgentStatus,
+  lastSeenAt: z.string().nullable(),
+  createdAt: z.string(),
+});
+export const AgentList = z.object({ items: z.array(Agent) });
+
+/** The agent exchanges its single-use enrollment token for a long-lived agent token. */
+export const AgentEnroll = z
+  .object({
+    token: z.string().min(1).max(300),
+    name: z.string().trim().min(1).max(120),
+    version: z.string().trim().max(64).default(""),
+    publicKey: z.string().max(4000).optional(),
+  })
+  .strict();
+export type AgentEnroll = z.infer<typeof AgentEnroll>;
+export const AgentEnrollResult = z.object({ agentId: z.string(), agentToken: z.string() });
+
 // ---- audit ----
 /** Every action name that may be written to audit_log. Adding an action means adding it here first. */
 export const AUDIT_ACTIONS = [
