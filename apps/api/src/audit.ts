@@ -1,3 +1,4 @@
+import type { AuditAction } from "@pantau/contracts";
 import { auditLog, newId, type Tx } from "@pantau/db";
 import type { TenantContext } from "./tenant";
 
@@ -5,7 +6,7 @@ import type { TenantContext } from "./tenant";
 export async function writeAudit(
   tx: Tx,
   t: TenantContext,
-  action: string,
+  action: AuditAction,
   target: string | null,
   meta: Record<string, unknown> = {},
 ): Promise<void> {

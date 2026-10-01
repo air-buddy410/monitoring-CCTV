@@ -117,6 +117,31 @@ export const CameraUpdate = z
   .refine((v) => Object.keys(v).length > 0, "at least one field must be provided");
 export type CameraUpdate = z.infer<typeof CameraUpdate>;
 
+// ---- audit action vocabulary (PRD F9: viewing and command actions must be auditable) ----
+// Reserved now so live/PTZ/playback are audited the moment their routes land.
+export const AUDIT_ACTIONS = [
+  "device.create",
+  "device.create.failed",
+  "device.update",
+  "device.delete",
+  "camera.snapshot",
+  "camera.snapshot.failed",
+  "camera.update",
+  "camera.delete",
+  "site.update",
+  "site.delete",
+  "grant.create",
+  "grant.delete",
+  "live.start",
+  "live.stop",
+  "ptz.command",
+  "playback.start",
+  "playback.stop",
+  "agent.enroll",
+  "agent.revoke",
+] as const;
+export type AuditAction = (typeof AUDIT_ACTIONS)[number];
+
 // ---- audit ----
 export const AuditItem = z.object({
   id: z.string(),
