@@ -8,7 +8,8 @@ Gelombang 2 dari PRD v0.2 (bagian 12). Semua pekerjaan memakai data dummy dan si
 |---|---|---|---|
 | `claude/pantau-web-mvp1` | [#2](https://github.com/air-buddy410/monitoring-CCTV/pull/2) (draft) | MVP-1 dan perbaikan Rex (R-1) | hijau untuk `a4611f4` (verify dan e2e) |
 | `claude/pantau-w2-m1` | [#3](https://github.com/air-buddy410/monitoring-CCTV/pull/3) (draft, basis `claude/pantau-web-mvp1`) | M1: 2FA, grant, CRUD, katalog audit, readiness | hijau untuk `77449c0` (verify dan e2e, 2 run) |
-| `claude/pantau-w2-m2-agent` | PR #4 (draft, basis `claude/pantau-w2-m1`) | M2 awal: agen, pendaftaran, protokol WS, halaman Agen | lihat bagian 8 |
+| `claude/pantau-w2-m2-agent` | [#5](https://github.com/air-buddy410/monitoring-CCTV/pull/5) (draft, basis `claude/pantau-w2-m1`) | M2 awal: agen, pendaftaran, protokol WS, halaman Agen | lihat bagian 8 |
+| `claude/pantau-m2-agents` | [#4](https://github.com/air-buddy410/monitoring-CCTV/pull/4) (draft, **bukan milik sesi ini**, dibuat Rex di basis yang sama saat sesi ini berjalan) | irisan M2 sisi server paralel | tidak disentuh; lihat bagian 9 |
 
 Tes ditulis lebih dulu dan terbukti merah sebelum kodenya untuk: CRUD site dan kamera, grant, 2FA, readiness, katalog audit (51 gagal), kontrak agen, pendaftaran dan agen (15 gagal), WebSocket agen (tidak ada rute, tes menggantung), dan 5 berkas unit agen. Pengecualian jujur, yang ditulis sebelum kodenya tetapi **tidak dijalankan merah** terlebih dulu: `agent-e2e.int.test.ts`, `agents.e2e.ts` (halaman Agen), tes E2E 2FA dan grant, dan tes layar M1; `env.unit.test.ts` ditulis bersama kodenya. Untuk pemindaian kebocoran, merahnya dibuktikan dengan mutasi (bagian 4).
 
@@ -19,11 +20,11 @@ Tes ditulis lebih dulu dan terbukti merah sebelum kodenya untuk: CRUD site dan k
 | `pnpm lint` | exit 0 | exit 0 |
 | `pnpm typecheck` | exit 0 | exit 0 |
 | `pnpm test:unit` | exit 0, **225 lulus** (23 berkas) | exit 0, **225 lulus** |
-| `pnpm test:integration` | exit 0, **224 lulus** (20 berkas) | exit 0, **224 lulus** |
+| `pnpm test:integration` | exit 0, **226 lulus** (20 berkas) | exit 0, **226 lulus** |
 | `pnpm build` | exit 0 (API, web, agen) | exit 0 |
 | `pnpm test:e2e` | exit 0, **69 lulus** (Chromium, Playwright 1.56.1) | exit 0, **69 lulus** |
 
-Sebelum gelombang ini (HEAD `a4611f4`): unit 135, integrasi 112, E2E 39. Tambahan: unit +90, integrasi +112, E2E +30. Kekhawatiran stabilitas: tes baru dijalankan berulang (agen WS 3 kali, klien agen 5 kali, e2e agen 3 kali, integrasi penuh 4 kali, tata letak M1 3 kali) tanpa kegagalan setelah perbaikan di bagian 6.
+Sebelum gelombang ini (HEAD `a4611f4`): unit 135, integrasi 112, E2E 39. Tambahan: unit +90, integrasi +114, E2E +30. Kekhawatiran stabilitas: tes baru dijalankan berulang (agen WS 3 kali, klien agen 5 kali, e2e agen 3 kali, integrasi penuh 4 kali, tata letak M1 3 kali) tanpa kegagalan setelah perbaikan di bagian 6.
 
 ## 3. Item per item
 
@@ -36,7 +37,7 @@ Sebelum gelombang ini (HEAD `a4611f4`): unit 135, integrasi 112, E2E 39. Tambaha
 | 5 | `/healthz` dan `/readyz` (DB, nanti pg-boss) | Selesai; titik pasang pg-boss siap, pg-boss belum ada | `health.int.test.ts` (6) |
 | 6 | `apps/agent`: WS dengan `Authorization: Agent`, hello, inventory.sync, status 30 dtk, backoff 1 sampai 60 dtk dengan jitter, heartbeat 20 dtk, batas waktu per permintaan | Selesai untuk lingkup ini | 66 tes unit di `apps/agent/test`, `agent-e2e.int.test.ts` (9) |
 | 7 | Skema Zod pesan agen (amplop `{id,type,ts,payload}`) dan endpoint agen | Selesai | `packages/contracts/src/agent.ts`, `agent.unit.test.ts` (11) |
-| 8 | `POST /v1/sites/:id/enrollments`, `GET /v1/agents`, `GET /v1/agents/:id`, `POST /v1/agents/:id/revoke`; token disimpan sebagai hash | Selesai (ditambah `POST /v1/agent/enroll`, D25) | `agent-enrollment.int.test.ts` (22), `agent-ws.int.test.ts` (24), `agents.e2e.ts` (3) |
+| 8 | `POST /v1/sites/:id/enrollments`, `GET /v1/agents`, `GET /v1/agents/:id`, `POST /v1/agents/:id/revoke`; token disimpan sebagai hash | Selesai (ditambah `POST /v1/agent/enroll`, D25) | `agent-enrollment.int.test.ts` (24), `agent-ws.int.test.ts` (24), `agents.e2e.ts` (3) |
 | 9 | Vault kredensial di agen, bukan di DB cloud untuk jalur agen | Selesai | `vault.unit.test.ts` (11), `devices.unit.test.ts` (10), pemindaian sentinel di `agent-e2e` |
 | 10 | Tes: agen mendaftar (mock), inventory sync, status, kredensial TIDAK ada di DB, log, pesan WS; token salah ditolak | Selesai | lihat bagian 4 |
 
@@ -86,4 +87,12 @@ Lengkap di `docs/DECISIONS.md` D20 sampai D30. Yang paling penting:
 
 ## 8. CI
 
-Lihat PR masing-masing untuk run terbaru. Run untuk commit terbaru cabang ini dicatat di deskripsi PR #4 sesudah push.
+Lihat PR masing-masing untuk run terbaru. Run untuk commit terbaru cabang ini dicatat di deskripsi PR #5 sesudah push.
+
+## 9. PR #4 (Rex) tumpang tindih dengan PR #5 ini
+
+Selama gelombang ini berjalan, PR #4 "PANTAU M2 (slice 1): enrollment + registry agen" (cabang `claude/pantau-m2-agents`, ditulis Rex karena sesi cloud sempat dikira terblokir kuota) dibuat pada basis `claude/pantau-w2-m1` yang sama. Sesi ini **tidak menyentuh, tidak me-merge, dan tidak menimpa** PR atau cabang itu. Tetapi dua PR itu tidak bisa di-merge berdampingan tanpa rekonsiliasi: keduanya menambah migrasi `0003`, `apps/api/src/agent-hub.ts`, `packages/contracts/src/agent.ts`, `routes/agents.ts`, dan memakai nama jalur yang berbeda untuk pendaftaran (`POST /v1/agents/enroll` di #4, `POST /v1/agent/enroll` di #5).
+
+Dari daftar berkas #4 (diff tidak diaudit baris demi baris): sisi server saja (hub, token, saluran WS, registri, migrasi `0003_agents` dan `0004_agent_channel`), tanpa `apps/agent`, vault di agen, UI web, atau pemindaian kebocoran. Yang tampak ada di #4 dan tidak di #5: `DELETE /v1/agents/:id` (hanya agen yang sudah dicabut). Yang tidak ada di #4 dan ada di #5: seluruh `apps/agent`, UI Agen, tes uji-ujung dengan relay perekam, pembatasan laju per koneksi, perlindungan kunci terlarang. Satu hal dari deskripsi #4 yang kini juga ada di #5: audit `agent.enroll.failed` untuk token terpakai atau kedaluwarsa.
+
+**Keputusan ada pada Budi**: pertahankan satu (rekomendasi saya #5, karena memuat agen dan bukti kebocoran, dengan #4 ditutup oleh pemiliknya setelah bagian yang berguna dipindahkan), atau minta rekonsiliasi eksplisit. Saya tidak melakukannya sendiri karena itu menyangkut pekerjaan Rex.

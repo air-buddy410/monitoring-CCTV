@@ -261,6 +261,44 @@ describe("agent enrollment, agents list and revocation (PRD 4.5, 9.1)", () => {
       expect((await enroll(e.token)).statusCode).toBe(201);
     });
 
+    it("a replayed or expired token is audited as agent.enroll.failed with the reason (the tenant is known), never with the token", async () => {
+      const used = await mint();
+      expect((await enroll(used.token)).statusCode).toBe(201);
+      expect((await enroll(used.token)).statusCode).toBe(401);
+      const expired = await mint();
+      await env.admin.query(
+        `update agent_enrollment set expires_at = now() - interval '1 second' where id = $1`,
+        [expired.id],
+      );
+      expect((await enroll(expired.token)).statusCode).toBe(401);
+      const rows = await env.admin.query(
+        `select actor_id, target, meta from audit_log where organization_id = $1 and action = 'agent.enroll.failed' and target = any($2)`,
+        [owner.orgId, [used.id, expired.id]],
+      );
+      const byTarget = new Map(rows.rows.map((r) => [r.target as string, r]));
+      expect(byTarget.get(used.id)?.meta).toMatchObject({ reason: "used", siteId });
+      expect(byTarget.get(expired.id)?.meta).toMatchObject({ reason: "expired", siteId });
+      for (const r of rows.rows) {
+        expect(r.actor_id).toBeNull();
+        expect(JSON.stringify(r.meta)).not.toMatch(/pae_|pat_/);
+      }
+    });
+
+    it("an unknown token leaves no audit row (no tenant to attribute it to) and a good one is not audited as a failure", async () => {
+      const before = Number(
+        (await env.admin.query(`select count(*) from audit_log where action = 'agent.enroll.failed'`)).rows[0]
+          .count,
+      );
+      expect((await enroll("pae_" + "Q".repeat(43))).statusCode).toBe(401);
+      const e = await mint();
+      expect((await enroll(e.token)).statusCode).toBe(201);
+      const after = Number(
+        (await env.admin.query(`select count(*) from audit_log where action = 'agent.enroll.failed'`)).rows[0]
+          .count,
+      );
+      expect(after).toBe(before);
+    });
+
     it("is audited as agent.enroll with no actor and without any token", async () => {
       const e = await mint();
       const res = (await enroll(e.token)).json() as Enrolled;

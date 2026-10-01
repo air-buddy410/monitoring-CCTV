@@ -122,14 +122,21 @@ export function agentRoutes(app: FastifyInstance, deps: Deps) {
       const agentToken = newToken("agent");
       const agentId = newId("agt");
 
-      const result = await withTokenHash(handle.db, hashToken(token), async (tx) => {
-        const [enr] = await tx
-          .select()
-          .from(agentEnrollment)
-          .where(and(isNull(agentEnrollment.usedAt), gt(agentEnrollment.expiresAt, new Date())))
-          .limit(1);
-        if (!enr) throw enrollmentInvalid();
+      type Outcome = { ok: true; siteId: string } | { ok: false };
+      const outcome = await withTokenHash(handle.db, hashToken(token), async (tx): Promise<Outcome> => {
+        const [enr] = await tx.select().from(agentEnrollment).limit(1);
+        // an unknown token has no tenant to attribute the attempt to; only the rate limiter and the 401 see it
+        if (!enr) return { ok: false };
         await enterTenant(tx, enr.organizationId);
+        const refuse = async (reason: "used" | "expired"): Promise<Outcome> => {
+          await writeAuditSystem(tx, enr.organizationId, req.ip, "agent.enroll.failed", enr.id, {
+            reason,
+            siteId: enr.siteId,
+          });
+          return { ok: false };
+        };
+        if (enr.usedAt) return refuse("used");
+        if (enr.expiresAt <= new Date()) return refuse("expired");
         // the conditional update is the claim: of any number of concurrent redemptions only one gets a row back
         const claimed = await tx
           .update(agentEnrollment)
@@ -142,7 +149,7 @@ export function agentRoutes(app: FastifyInstance, deps: Deps) {
             ),
           )
           .returning({ id: agentEnrollment.id });
-        if (!claimed[0]) throw enrollmentInvalid();
+        if (!claimed[0]) return refuse("used");
         await tx.insert(agent).values({
           id: agentId,
           organizationId: enr.organizationId,
@@ -157,8 +164,11 @@ export function agentRoutes(app: FastifyInstance, deps: Deps) {
           siteId: enr.siteId,
           enrollmentId: enr.id,
         });
-        return { siteId: enr.siteId };
+        return { ok: true, siteId: enr.siteId };
       });
+      // thrown only after the transaction committed, so the failure audit row is kept
+      if (!outcome.ok) throw enrollmentInvalid();
+      const result = outcome;
       return reply
         .status(201)
         .send({ agentId, siteId: result.siteId, agentToken, websocketPath: "/agent" as const });
