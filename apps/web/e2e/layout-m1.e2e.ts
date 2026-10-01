@@ -3,6 +3,7 @@ import { audit, expectClean } from "./audit";
 import {
   closeDb,
   enableTotpViaApi,
+  enrollAgentViaApi,
   grantAccess,
   loginUi,
   newMember,
@@ -40,6 +41,8 @@ for (const scheme of SCHEMES) {
       const { device, cameras } = await seedDevice(owner, mock);
       await grantAccess(owner, operator.userId, "camera", cameras[0]?.id as string, "operate");
       await grantAccess(owner, viewer.userId, "camera", cameras[1]?.id as string, "view");
+      // arranged now: confirming 2FA later in this test replaces the owner's API session
+      await enrollAgentViaApi(owner, "Agen Tata Letak");
 
       // second-factor step of the sign-in screen (a separate user who has TOTP)
       const guarded = await newTenant(`m1g${width}${scheme}`);
@@ -88,6 +91,23 @@ for (const scheme of SCHEMES) {
       await page.getByRole("button", { name: "Beri akses" }).click();
       await expect(page.getByRole("dialog", { name: "Beri akses" })).toBeVisible();
       expectClean(await audit(page), `dialog beri akses ${width} ${scheme}`);
+      await page.keyboard.press("Escape");
+
+      // Agen: an enrolled (offline) agent, the token dialog with a fresh token, and the revoke confirmation
+      await page.goto("/agen");
+      await expect(page.getByRole("article", { name: "Agen Tata Letak" })).toBeVisible();
+      expectClean(await audit(page), `agen daftar ${width} ${scheme}`);
+      await page.getByRole("button", { name: "Buat token pendaftaran" }).click();
+      await page
+        .getByRole("dialog", { name: "Token pendaftaran agen" })
+        .getByRole("button", { name: "Buat token" })
+        .click();
+      await expect(page.getByTestId("enroll-token")).toBeVisible();
+      expectClean(await audit(page), `agen token ${width} ${scheme}`);
+      await page.keyboard.press("Escape");
+      await page.getByRole("button", { name: "Cabut agen Agen Tata Letak" }).click();
+      await expect(page.getByRole("dialog", { name: "Cabut agen?" })).toBeVisible();
+      expectClean(await audit(page), `agen cabut ${width} ${scheme}`);
       await page.keyboard.press("Escape");
 
       for (const [who, label] of [

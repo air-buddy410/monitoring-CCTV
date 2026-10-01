@@ -2,6 +2,7 @@ import { expect, type Locator, type Page, test } from "@playwright/test";
 import {
   closeDb,
   enableTotpViaApi,
+  enrollAgentViaApi,
   grantAccess,
   loginUi,
   newMember,
@@ -224,6 +225,14 @@ for (const scheme of SCHEMES) {
       await page.getByRole("button", { name: "Beri akses" }).click();
       await expect(page.getByRole("dialog", { name: "Beri akses" })).toBeVisible();
       await auditStates(page, `dialog beri akses ${width} ${scheme}`);
+      await page.keyboard.press("Escape");
+      await enrollAgentViaApi(owner, "Agen Kontras");
+      await page.goto("/agen");
+      await expect(page.getByRole("article", { name: "Agen Kontras" })).toBeVisible();
+      await auditStates(page, `agen ${width} ${scheme}`);
+      await page.getByRole("button", { name: "Buat token pendaftaran" }).click();
+      await expect(page.getByRole("dialog", { name: "Token pendaftaran agen" })).toBeVisible();
+      await auditStates(page, `dialog token ${width} ${scheme}`);
       await mock.stop();
       await context.close();
     });

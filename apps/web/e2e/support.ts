@@ -261,3 +261,29 @@ export async function enableTotpViaApi(t: Tenant): Promise<{ secret: string; bac
   if (!ver.ok) throw new Error(`2fa verify failed ${ver.status}`);
   return { secret, backup: body.backupCodes };
 }
+
+/** Mint a token and register an agent through the real API (arranging state; the UI path is covered separately). */
+export async function enrollAgentViaApi(
+  owner: Tenant,
+  name: string,
+): Promise<{ agentId: string; agentToken: string }> {
+  const headers = { ...json, cookie: cookieHeader(owner.cookie) };
+  const sites = (await (await fetch(`${API}/v1/sites`, { headers })).json()) as { items: { id: string }[] };
+  const siteId = sites.items[0]?.id;
+  const enr = (await (
+    await fetch(`${API}/v1/sites/${siteId}/enrollments`, { method: "POST", headers, body: "{}" })
+  ).json()) as {
+    token: string;
+  };
+  const { generateKeyPairSync } = await import("node:crypto");
+  const publicKey = generateKeyPairSync("ed25519")
+    .publicKey.export({ type: "spki", format: "der" })
+    .toString("base64");
+  const res = await fetch(`${API}/v1/agent/enroll`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Enroll ${enr.token}` },
+    body: JSON.stringify({ name, publicKey, hostname: "mini-pc-lab", agentVersion: "0.1.0" }),
+  });
+  if (res.status !== 201) throw new Error(`agent enroll failed ${res.status}`);
+  return (await res.json()) as { agentId: string; agentToken: string };
+}

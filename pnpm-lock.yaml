@@ -161,6 +161,9 @@ importers:
         specifier: ^4.1.0
         version: 4.6.5
     devDependencies:
+      '@pantau/agent':
+        specifier: workspace:*
+        version: link:../agent
       '@pantau/mock-onvif':
         specifier: workspace:*
         version: link:../../packages/mock-onvif

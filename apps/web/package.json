@@ -25,6 +25,7 @@
     "zod": "^4.1.0"
   },
   "devDependencies": {
+    "@pantau/agent": "workspace:*",
     "@pantau/mock-onvif": "workspace:*",
     "@playwright/test": "1.56.1",
     "@tailwindcss/postcss": "^4.1.0",

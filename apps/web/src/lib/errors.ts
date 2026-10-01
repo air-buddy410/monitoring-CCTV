@@ -68,6 +68,7 @@ const BY_CODE: Record<string, Message> = {
     title: "Anggota ini sudah punya akses ke target itu.",
     hint: "Cabut dulu bila ingin mengubahnya.",
   },
+  agent_not_found: { title: "Agen tidak ditemukan.", hint: "Muat ulang daftar agen." },
   member_not_found: { title: "Anggota itu tidak ada di organisasi ini." },
   grant_not_found: { title: "Akses itu sudah tidak ada.", hint: "Muat ulang daftar akses." },
   INVALID_CODE: {

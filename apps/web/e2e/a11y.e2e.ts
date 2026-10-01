@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { closeDb, newTenant, seedDevice, signInAs, startMock } from "./support";
+import { closeDb, enrollAgentViaApi, newTenant, seedDevice, signInAs, startMock } from "./support";
 
 test.afterAll(closeDb);
 
@@ -91,6 +91,10 @@ for (const scheme of SCHEMES) {
     await page.goto("/keamanan");
     await expect(page.getByRole("heading", { name: "Keamanan akun" })).toBeVisible();
     await auditFocus(page, `keamanan ${scheme}`);
+    await enrollAgentViaApi(t, "Agen Fokus");
+    await page.goto("/agen");
+    await expect(page.getByRole("article", { name: "Agen Fokus" })).toBeVisible();
+    await auditFocus(page, `agen ${scheme}`);
     await mock.stop();
     await context.close();
   });
