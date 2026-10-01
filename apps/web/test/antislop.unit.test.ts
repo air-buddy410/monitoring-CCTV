@@ -17,7 +17,7 @@ const text = (p: string) => readFileSync(p, "utf8");
 describe("UI source hygiene", () => {
   it("has source files to check", () => expect(files.length).toBeGreaterThan(10));
   it("contains no em dash or en dash (R-02)", () => {
-    for (const f of files) expect(text(f), f).not.toMatch(/[–—]/);
+    for (const f of files) expect(text(f), f).not.toMatch(new RegExp("[\u2013\u2014]"));
   });
   it("contains no emoji", () => {
     for (const f of files) expect(text(f), f).not.toMatch(/\p{Extended_Pictographic}/u);
