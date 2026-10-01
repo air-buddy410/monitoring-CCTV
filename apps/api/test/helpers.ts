@@ -1,4 +1,4 @@
-import { createHmac, randomUUID } from "node:crypto";
+import { createHash, createHmac, generateKeyPairSync, randomUUID } from "node:crypto";
 import { Writable } from "node:stream";
 import { type MockOnvif, type MockOnvifOptions, startMockOnvif } from "@pantau/mock-onvif";
 import pg from "pg";
@@ -15,6 +15,8 @@ export const USER_PASSWORD = "Dummy-User-Login-Pw-5521!";
 
 export interface TestEnv {
   built: BuiltApp;
+  /** Start a real HTTP listener on a free loopback port (needed for WebSocket tests). */
+  listen(): Promise<{ httpUrl: string; wsUrl: string }>;
   logs: string[];
   mocks: MockOnvif[];
   close(): Promise<void>;
@@ -56,6 +58,12 @@ export async function createTestEnv(overrides: Record<string, string> = {}): Pro
     logs,
     mocks,
     admin,
+    async listen() {
+      await built.app.listen({ port: 0, host: "127.0.0.1" });
+      const addr = built.app.server.address();
+      const port = typeof addr === "object" && addr ? addr.port : 0;
+      return { httpUrl: `http://127.0.0.1:${port}`, wsUrl: `ws://127.0.0.1:${port}` };
+    },
     async startMock(opts = {}) {
       const m = await startMockOnvif({
         username: DEVICE_USERNAME,
@@ -152,6 +160,12 @@ export function totpFromUri(uri: string, atMs = Date.now()): string {
   const code = (h.readUInt32BE(off) & 0x7fffffff) % 1_000_000;
   return code.toString().padStart(6, "0");
 }
+
+/** A fresh Ed25519 public key as an agent would send it (SPKI DER, base64). */
+export function newAgentPublicKey(): string {
+  return generateKeyPairSync("ed25519").publicKey.export({ type: "spki", format: "der" }).toString("base64");
+}
+export const sha256Hex = (s: string) => createHash("sha256").update(s).digest("hex");
 
 export async function createSite(env: TestEnv, t: Tenant, name = "Site Dummy") {
   const res = await env.built.app.inject({

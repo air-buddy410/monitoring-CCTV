@@ -41,6 +41,8 @@ const Env = z.object({
   RATE_LIMIT_AUTH_PER_MIN: perMin(10),
   // PRD section 11: 2FA is mandatory for roles that can see video. Unset = on in production, off elsewhere.
   REQUIRE_2FA_FOR_VIDEO: z.enum(["true", "false"]).optional(),
+  AGENT_PING_INTERVAL_MS: z.coerce.number().int().min(50).max(120_000).default(20_000),
+  AGENT_MAX_MESSAGES_PER_10S: z.coerce.number().int().min(5).max(10_000).default(60),
   READINESS_TIMEOUT_MS: z.coerce.number().int().min(50).max(30_000).default(2000),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
 });
@@ -62,6 +64,8 @@ export interface Config {
   rateLimit: { windowMs: number; probe: number; snapshot: number; auth: number };
   require2faForVideo: boolean;
   readinessTimeoutMs: number;
+  agentPingIntervalMs: number;
+  agentMaxMessagesPer10s: number;
 }
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
@@ -104,6 +108,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
         ? e.NODE_ENV === "production"
         : e.REQUIRE_2FA_FOR_VIDEO === "true",
     readinessTimeoutMs: e.READINESS_TIMEOUT_MS,
+    agentPingIntervalMs: e.AGENT_PING_INTERVAL_MS,
+    agentMaxMessagesPer10s: e.AGENT_MAX_MESSAGES_PER_10S,
     rateLimit: {
       windowMs: e.RATE_LIMIT_WINDOW_MS,
       probe: e.RATE_LIMIT_PROBE_PER_MIN,

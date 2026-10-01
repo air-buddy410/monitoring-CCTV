@@ -9,11 +9,14 @@ import {
   validatorCompiler,
   type ZodTypeProvider,
 } from "fastify-type-provider-zod";
+import { AgentHub } from "./agent-hub";
 import type { Config } from "./config";
 import { AppError, rateLimited } from "./errors";
 import { createLogger } from "./logger";
 import { createRateLimiter, type RateLimiter } from "./rate-limit";
 import { createReadiness, type Readiness } from "./readiness";
+import { agentWsRoutes } from "./routes/agent-ws";
+import { agentRoutes } from "./routes/agents";
 import { auditRoutes } from "./routes/audit";
 import { deviceRoutes } from "./routes/devices";
 import { grantRoutes } from "./routes/grants";
@@ -30,12 +33,14 @@ export interface Deps {
   resolveTenant: ReturnType<typeof createTenantResolver>;
   limiter: RateLimiter;
   readiness: Readiness;
+  hub: AgentHub;
 }
 export interface BuiltApp {
   app: FastifyInstance;
   auth: ReturnType<typeof createAuth>;
   handle: DbHandle;
   readiness: Readiness;
+  hub: AgentHub;
   close(): Promise<void>;
 }
 export type { Role };
@@ -83,6 +88,7 @@ export async function buildApp(opts: {
         { name: "sites" },
         { name: "devices" },
         { name: "grants" },
+        { name: "agents" },
         { name: "cameras" },
         { name: "audit" },
       ],
@@ -186,6 +192,7 @@ export async function buildApp(opts: {
     vault,
     limiter,
     readiness,
+    hub: new AgentHub(),
     resolveTenant: createTenantResolver(auth, handle.db),
   };
   app.get("/docs/json", { schema: { hide: true } }, async () => app.swagger());
@@ -194,6 +201,8 @@ export async function buildApp(opts: {
   deviceRoutes(app, deps);
   snapshotRoutes(app, deps);
   grantRoutes(app, deps);
+  agentRoutes(app, deps);
+  await agentWsRoutes(app, deps);
   auditRoutes(app, deps);
 
   app.withTypeProvider<ZodTypeProvider>();
@@ -202,7 +211,9 @@ export async function buildApp(opts: {
     auth,
     handle,
     readiness,
+    hub: deps.hub,
     async close() {
+      deps.hub.closeAll();
       await app.close();
       await handle.close();
     },
