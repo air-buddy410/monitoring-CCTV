@@ -38,7 +38,7 @@ const FIELD_FOR_CODE: Record<string, (keyof DeviceFormValues)[]> = {
   site_not_found: ["siteId"],
 };
 
-export function AddDeviceDialog({ open, onClose, sites, onCreated }: Props) {
+function AddDeviceForm({ onClose, sites, onCreated }: Omit<Props, "open">) {
   const [v, setV] = useState<DeviceFormValues>({
     siteId: sites[0]?.id ?? NEW_SITE,
     newSiteName: "",
@@ -109,7 +109,7 @@ export function AddDeviceDialog({ open, onClose, sites, onCreated }: Props) {
     ) : null;
 
   return (
-    <Dialog open={open} onClose={onClose} title="Tambah perangkat">
+    <>
       <form onSubmit={submit} noValidate className="space-y-4 overflow-y-auto p-4">
         {PRESETS.length > 0 ? (
           <div role="note" className="border border-hair bg-panel p-3">
@@ -260,6 +260,15 @@ export function AddDeviceDialog({ open, onClose, sites, onCreated }: Props) {
           </button>
         </div>
       </form>
+    </>
+  );
+}
+
+/** The dialog shell. The form lives inside and exists only while open, so closing always discards typed values. */
+export function AddDeviceDialog({ open, onClose, sites, onCreated }: Props) {
+  return (
+    <Dialog open={open} onClose={onClose} title="Tambah perangkat">
+      <AddDeviceForm onClose={onClose} sites={sites} onCreated={onCreated} />
     </Dialog>
   );
 }

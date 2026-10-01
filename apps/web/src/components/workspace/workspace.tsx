@@ -171,7 +171,6 @@ export function Workspace() {
       </div>
 
       <AddDeviceDialog
-        key={adding ? "open" : "closed"}
         open={adding}
         onClose={() => setAdding(false)}
         sites={data.sites}

@@ -11,7 +11,8 @@
     "test:e2e": "tsx scripts/prepare-db.ts pantau_e2e && playwright test",
     "demo:frames": "node scripts/make-demo-frames.mjs",
     "e2e:db": "tsx scripts/prepare-db.ts",
-    "demo": "tsx scripts/demo.ts"
+    "demo": "tsx scripts/demo.ts",
+    "demo:screenshots": "tsx scripts/screenshots.ts"
   },
   "dependencies": {
     "@fontsource/atkinson-hyperlegible-mono": "^5.2.0",

@@ -51,12 +51,21 @@ interface DialogProps {
 /** Native <dialog>: the browser provides the focus trap, Escape, and returns focus to the opener. */
 export function Dialog({ open, onClose, title, children, className, bare }: DialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
+  const opener = useRef<HTMLElement | null>(null);
   const titleId = useId();
   useEffect(() => {
     const d = ref.current;
     if (!d) return;
-    if (open && !d.open) d.showModal();
-    if (!open && d.open) d.close();
+    if (open && !d.open) {
+      opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      d.showModal();
+    }
+    if (!open && d.open) {
+      d.close();
+      // Native restoration is skipped when the focused control was unmounted first.
+      const back = opener.current;
+      if (back?.isConnected && document.activeElement !== back) back.focus();
+    }
   }, [open]);
   return (
     <dialog

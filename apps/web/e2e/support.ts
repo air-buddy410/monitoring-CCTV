@@ -195,3 +195,14 @@ export async function loginUi(page: Page, email: string, password = USER_PASSWOR
   await page.getByLabel("Kata sandi").fill(password);
   await page.getByRole("button", { name: "Masuk", exact: true }).click();
 }
+
+/** A second organization for the same user (Better Auth makes the newly created one active). */
+export async function addOrg(t: Tenant, name: string): Promise<string> {
+  const res = await fetch(`${API}/api/auth/organization/create`, {
+    method: "POST",
+    headers: { ...json, cookie: cookieHeader(t.cookie) },
+    body: JSON.stringify({ name, slug: `org-${randomUUID().slice(0, 8)}` }),
+  });
+  if (!res.ok) throw new Error(`org create failed ${res.status}`);
+  return ((await res.json()) as { id: string }).id;
+}

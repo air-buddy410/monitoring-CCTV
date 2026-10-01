@@ -195,7 +195,10 @@ export function DeviceRail({ devices, cameras, sites, role, selectedId, onAdd, h
                     aria-current={active ? "true" : undefined}
                     className={`block min-h-11 border-2 p-3 ${active ? "border-accent-ink bg-raised" : "border-hair bg-panel hover:border-line"}`}
                   >
-                    <span className="block font-bold">{d.name}</span>
+                    <span className="block font-bold">
+                      {d.name}
+                      {active ? " (dipilih)" : ""}
+                    </span>
                     <span className="block text-muted">
                       {d.brand || d.model ? (
                         <>

@@ -35,7 +35,9 @@ export function CameraSlots({ deviceId, cameras, selectedId, shots }: Props) {
                   {s?.status === "ready" ? (
                     <img src={s.frame.url} alt="" className="h-full w-full object-cover" />
                   ) : (
-                    <span className="mono px-2 text-center text-[var(--viewer-text)]">Belum diambil</span>
+                    <span aria-hidden="true" className="mono px-2 text-center text-[var(--viewer-text)]">
+                      Belum diambil
+                    </span>
                   )}
                 </span>
                 <span className="block p-2">
@@ -46,7 +48,9 @@ export function CameraSlots({ deviceId, cameras, selectedId, shots }: Props) {
                   <span className="mono block text-muted">kanal {c.channel}</span>
                   <span className="block text-muted">
                     {c.hasPtz ? "PTZ terdeteksi" : "Tanpa PTZ"}
-                    {s?.status === "ready" ? ` · diterima ${formatClock(s.frame.receivedAt)}` : ""}
+                    {s?.status === "ready"
+                      ? ` · diterima ${formatClock(s.frame.receivedAt)}`
+                      : " · belum diambil"}
                   </span>
                 </span>
               </Link>

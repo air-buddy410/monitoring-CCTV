@@ -148,7 +148,15 @@ for (const scheme of SCHEMES) {
       }
       await page.goto("/perangkat");
       await page.getByRole("button", { name: "Tambah perangkat" }).first().click();
-      await expect(page.getByRole("dialog", { name: "Tambah perangkat" })).toBeVisible();
+      const addDialog = page.getByRole("dialog", { name: "Tambah perangkat" });
+      await expect(addDialog).toBeVisible();
+      const gap = await addDialog.evaluate((d) => {
+        const r = d.getBoundingClientRect();
+        return { left: r.left, right: document.documentElement.clientWidth - r.right, top: r.top };
+      });
+      expect(Math.abs(gap.left - gap.right), `${width}: dialog not centered`).toBeLessThanOrEqual(2);
+      expect(gap.left, `${width}: dialog touches the edge`).toBeGreaterThanOrEqual(8);
+      expect(gap.top).toBeGreaterThanOrEqual(8);
       expectClean(await audit(page), `dialog tambah ${width} ${scheme}`);
       await page.keyboard.press("Escape");
       if (width < 720) {
