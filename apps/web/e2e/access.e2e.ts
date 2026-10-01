@@ -152,6 +152,11 @@ test("sesi berakhir: kembali ke login dengan pesan, lalu lanjut ke halaman semul
 test("login: kata sandi salah ditolak dengan pesan jelas dan kolom sandi dikosongkan", async ({ page }) => {
   const t = await newTenant("lg");
   const w = watch(page, [401]);
+  await page.goto("/login");
+  await page.getByRole("button", { name: "Belum punya akun? Daftar" }).click();
+  await expect(page.getByRole("heading", { name: "Buat akun" })).toBeVisible();
+  await page.getByRole("button", { name: "Sudah punya akun? Masuk" }).click();
+  await expect(page.getByRole("heading", { name: "Masuk", exact: true })).toBeVisible();
   await loginUi(page, t.email, "Wrong-Dummy-Login-0000!");
   await expect(page.getByText("Email atau kata sandi salah.")).toBeVisible();
   await expect(page.getByLabel("Kata sandi")).toHaveValue("");

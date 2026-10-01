@@ -54,6 +54,8 @@ test("ponsel 390px: Menu, navigasi, pindah organisasi, saring, kembali ke daftar
   await page.getByLabel("Cari perangkat").fill("");
   await page.getByRole("button", { name: /^Saring/ }).click();
   const sheet = page.getByRole("dialog", { name: "Saring perangkat" });
+  await sheet.getByLabel("Lokasi").selectOption({ index: 1 });
+  await sheet.getByLabel("Lokasi").selectOption({ index: 0 });
   await sheet.getByLabel("Jenis").selectOption("nvr");
   await sheet.getByRole("button", { name: /^Lihat 0 perangkat/ }).click();
   await expect(sheet).toBeHidden();
@@ -142,5 +144,88 @@ test("desktop: pilihan perangkat dan kamera punya penanda teks, tombol Tutup dia
   await page.getByRole("link", { name: "Ganti organisasi" }).click();
   await expect(page.getByText("(aktif)")).toBeVisible();
   expect(w.consoleErrors, w.consoleErrors.join("\n")).toEqual([]);
+  await mock.stop();
+});
+
+test("kontrol yang tersisa: logo, layar penuh (tutup dan unduh nyata), keadaan kosong, halaman organisasi, pemulihan", async ({
+  page,
+  context,
+}) => {
+  const mock = await startMock({ channels: 1 });
+  const t = await newTenant("rest");
+  const empty = await newTenant("rest-kosong");
+  const { device } = await seedDevice(t, mock);
+  await signInAs(context, t);
+  const w = watch(page, [500]);
+
+  await page.goto(`/perangkat?d=${device.id}`);
+  await page.getByRole("button", { name: "Ambil snapshot", exact: true }).click();
+  await expect(page.locator("img[alt^='Snapshot kamera']")).toBeVisible();
+
+  // Download really delivers a JPEG file.
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("link", { name: "Unduh JPEG" }).click(),
+  ]);
+  expect(download.suggestedFilename()).toMatch(/\.jpg$/);
+
+  // Full screen closes with its own button, and focus returns.
+  const full = page.getByRole("button", { name: "Layar penuh" });
+  await full.click();
+  const viewer = page.getByRole("dialog", { name: "Snapshot VSC0" });
+  await expect(viewer).toBeVisible();
+  await viewer.getByRole("button", { name: "Tutup layar penuh" }).click();
+  await expect(viewer).toBeHidden();
+  await expect(full).toBeFocused();
+
+  // The wordmark goes back to the device list.
+  await page.getByRole("link", { name: "PANTAU" }).click();
+  await expect(page).toHaveURL(/\/perangkat$/);
+
+  // The organization page has its own logout button.
+  await page.getByRole("link", { name: "Ganti organisasi" }).click();
+  await expect(page.getByRole("heading", { name: "Pilih organisasi" })).toBeVisible();
+  await page.getByRole("main").getByRole("button", { name: "Keluar" }).click();
+  await expect(page).toHaveURL(/\/login/);
+
+  // Sign-up and sign-in modes toggle back and forth.
+  await page.getByRole("button", { name: "Belum punya akun? Daftar" }).click();
+  await expect(page.getByRole("heading", { name: "Buat akun" })).toBeVisible();
+  await page.getByRole("button", { name: "Sudah punya akun? Masuk" }).click();
+  await expect(page.getByRole("heading", { name: "Masuk", exact: true })).toBeVisible();
+
+  // Empty state offers its own Tambah perangkat button (the second one on the page).
+  await context.clearCookies();
+  await signInAs(context, empty);
+  await page.goto("/perangkat");
+  await page.getByRole("button", { name: "Tambah perangkat" }).last().click();
+  await expect(page.getByRole("dialog", { name: "Tambah perangkat" })).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  // Session cannot be loaded: message with a working Muat ulang.
+  await page.route("**/api/auth/get-session", (r) => r.abort());
+  await page.goto("/perangkat");
+  await expect(page.getByText("Sesi tidak dapat dimuat.")).toBeVisible();
+  await page.unroute("**/api/auth/get-session");
+  await page.getByRole("button", { name: "Muat ulang" }).click();
+  await expect(page.getByText("Belum ada perangkat di organisasi ini.")).toBeVisible();
+
+  // Audit load failure: message with a working Coba lagi.
+  await page.route("**/v1/audit**", (r) =>
+    r.fulfill({
+      status: 500,
+      contentType: "application/problem+json",
+      body: JSON.stringify({ type: "about:blank", title: "x", status: 500, code: "internal_error" }),
+    }),
+  );
+  await page.goto("/audit");
+  await expect(page.getByText("Server mengalami galat.")).toBeVisible();
+  await page.unroute("**/v1/audit**");
+  await page.getByRole("button", { name: "Coba lagi" }).click();
+  await expect(page.getByText("Belum ada catatan audit.")).toBeVisible();
+  expect(
+    w.consoleErrors.filter((e) => !/ERR_FAILED|Failed to load resource/.test(e)),
+    w.consoleErrors.join("\n"),
+  ).toEqual([]);
   await mock.stop();
 });
