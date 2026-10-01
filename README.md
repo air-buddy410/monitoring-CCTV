@@ -8,7 +8,11 @@ with authentication + tenants (Better Auth organizations), tenant isolation by *
 an **ONVIF method whitelist** with timeouts, and a **mock ONVIF device** so nothing needs a physical camera.
 
 Not included (later phases): live video / go2rtc / WebRTC / TURN, WS-Discovery, agent WebSocket, NVR playback,
-motion events, PWA/web UI, 2FA, Hikvision/Dahua adapters. See `docs/DECISIONS.md` for deviations from the PRD
+motion events, PWA, 2FA, Hikvision/Dahua adapters.
+
+The web app (`apps/web`, MVP-1) is a frontend for exactly this slice: sign in, pick an organization, add a device,
+read the probe sheet, take snapshots. See `DESIGN.md`, `docs/DEMO.md` (local "Simulasi" demo, E2E tests) and
+`docs/HASIL-FRONTEND.md` (verification results). See `docs/DECISIONS.md` for deviations from the PRD
 and `docs/HASIL-CLOUD.md` for verification results and known gaps.
 
 ## Requirements
@@ -89,7 +93,9 @@ Add device / snapshot need operator+, audit needs owner, reads need any member.
 | `pnpm test:unit` | unit tests (whitelist, vault, digest, target policy, config/redaction) |
 | `pnpm test:integration` | integration tests: API + real PostgreSQL + mock ONVIF (tenant isolation, RLS, secrets, whitelist, audit, OpenAPI) |
 | `pnpm test` | unit + integration |
-| `pnpm build` | typecheck libs, bundle the API with tsup (`apps/api/dist`) |
+| `pnpm build` | typecheck libs, bundle the API with tsup, build the web app (`apps/web/.next`) |
+| `pnpm test:e2e` | browser tests (Playwright, Chromium) against the real API and PostgreSQL; needs `playwright install chromium` once, see `docs/DEMO.md` |
+| `pnpm demo` | local "Simulasi" stack on http://localhost:3100 (mock ONVIF, dummy account), see `docs/DEMO.md` |
 | `pnpm verify` | lint + typecheck + test + build |
 
 Integration tests need PostgreSQL and (re)create the database `pantau_test`. They connect as superuser to
@@ -100,6 +106,7 @@ dummy password). They never contact anything except in-process mocks/decoys on 1
 
 ```
 apps/api            Fastify 5 + Zod + OpenAPI, Better Auth mount, routes, vault, target policy
+apps/web            Next.js 16 + Tailwind 4 frontend (login, organization, devices, snapshots, audit), Playwright E2E
 packages/contracts  Zod schemas shared by API (and later agent/web)
 packages/db         SQL migrations (RLS), Drizzle schema, withTenant()
 packages/auth       Better Auth config (organization plugin)

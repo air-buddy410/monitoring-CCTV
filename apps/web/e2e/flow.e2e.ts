@@ -166,6 +166,7 @@ test("papan ketik: dialog menjebak fokus, Escape menutup, fokus kembali ke pemic
 
 test("papan ketik: layar masuk bisa dipakai tanpa mouse dan fokus selalu terlihat", async ({ page }) => {
   await page.goto("/login");
+  await expect(page.getByLabel("Email")).toBeVisible();
   const order: string[] = [];
   for (let i = 0; i < 4; i++) {
     await page.keyboard.press("Tab");

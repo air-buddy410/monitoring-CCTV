@@ -64,3 +64,26 @@ Batasan: hanya satu proses (multi-instance butuh penyimpanan bersama); IP klien 
 
 ## D15. Tes tidak bergantung pada `pg_dump`
 `pg_dump` klien 16 menolak server 17. Tes "kata sandi tidak ada di seluruh DB" kini memindai semua baris semua tabel `public` lewat SQL (`t::text`), asersinya sama. Cakupan tetap hanya data tabel (bukan berkas WAL/data directory).
+
+## D16. Frontend MVP-1: stack dan deviasi dari PRD (apps/web)
+- Next.js 16 (App Router), React 19, Tailwind CSS 4, TypeScript, sesuai PRD. **Tanpa shadcn/ui**: PRD menyebutnya, tetapi identitas visual buatan sendiri (DESIGN.md) lebih jelas dibangun dari komponen sendiri. Tanpa pustaka data (TanStack Query) dan tanpa Radix: kebutuhan kecil dan terkendali.
+- Dialog memakai `<dialog>` native: Escape dan penutupan sudah baku di browser. Siklus fokus (Tab dan Shift+Tab berputar di dalam dialog) dan pengembalian fokus ke pemicu ditulis eksplisit di `apps/web/src/components/ui.tsx` karena dialog native saja tidak menjebak fokus secara siklik, dan fokus tidak kembali bila elemen terfokus dilepas lebih dulu. Keduanya diuji di E2E.
+- Browser hanya berbicara ke origin web. Next.js `rewrites` meneruskan `/api/auth/*` dan `/v1/*` ke API, jadi cookie sesi (httpOnly, dari backend) dan pemeriksaan Origin/CSRF backend (D13) tetap berlaku. Tujuan rewrite terpanggang saat build (`PANTAU_API_ORIGIN`). Tanpa token di localStorage, URL, atau JS. `BASE_URL` backend harus sama dengan origin web.
+- Respons API divalidasi di browser dengan skema Zod dari `@pantau/contracts` (dipakai langsung, bukan salinan tipe). Respons yang tidak sesuai kontrak menampilkan galat, bukan data setengah benar.
+- Font Atkinson Hyperlegible di-host sendiri lewat `@fontsource` (OFL). Tanpa permintaan ke CDN font.
+- Tes: unit Vitest di `apps/web/test` (kontras dihitung dari `tokens.css` asli, pemetaan galat, filter, validasi, redirect aman, pemeriksaan higiene antislop), E2E Playwright di `apps/web/e2e` terhadap API nyata dan PostgreSQL nyata. CI memiliki job `e2e` terpisah supaya gerbang backend tidak berubah.
+
+## D17. Kejujuran label di UI
+- API menyimpan `status: "online"` pada saat perangkat dibuat. Itu bukan status sekarang, jadi UI tidak menampilkannya dan tidak memakai kata "online". Yang ditampilkan: "Probe terakhir" dengan tanggal penambahan dan catatan bahwa itu hasil probe saat itu.
+- Respons snapshot tidak membawa waktu tangkap dari perangkat. UI menampilkan "Diterima di browser {jam}", bukan waktu dari kamera.
+- Kemampuan memakai kosakata API (ya, tidak, belum-diuji) sebagai "Terbukti saat probe", "Tidak tersedia", "Belum diuji", selalu dengan glif dan teks. "ptz" tampil sebagai "Konfigurasi PTZ terdeteksi" karena PANTAU belum menyediakan kendali PTZ.
+- Snapshot yang gagal tidak pernah tampil sebagai gambar: respons harus `image/jpeg` dan tidak kosong, dan gambar yang gagal dimuat diganti keadaan galat. Gambar sebelumnya dibuang saat pengambilan ulang gagal, supaya gambar lama tidak terbaca sebagai hasil terbaru.
+- Nama merek dari API sudah dinormalisasi huruf kecil; UI hanya mengkapitalisasi tampilannya.
+
+## D18. Fitur yang diminta tetapi belum didukung API (dikeluarkan dari UI)
+Probe ulang perangkat, ubah atau hapus perangkat, lokasi, atau kamera, status perangkat terkini, waktu tangkap dari perangkat, paginasi dan penyaringan sisi server (daftar dimuat penuh, penyaringan dilakukan di browser), penyaringan audit selain jumlah, manajemen anggota dan undangan, 2FA, grant per kamera. Tidak ada endpoint ditambahkan dan tidak ada migrasi.
+
+## D19. Sesi dan organisasi di UI
+- Login baru tidak punya organisasi aktif. Bila pengguna hanya punya satu organisasi, UI mengaktifkannya otomatis lewat `organization/set-active`. Bila lebih dari satu atau nol, UI menampilkan pemilih organisasi.
+- Peran dibaca dari `organization/get-active-member-role` dan dipetakan seperti D5. UI menyembunyikan aksi yang tidak diizinkan (tambah perangkat, snapshot, audit), tetapi server tetap yang menegakkan; E2E memaksa endpoint tersebut dan memeriksa 403.
+- Respons 401 pada `/v1` mengarahkan ke `/login?expired=1&next=...` dan setelah masuk kembali ke halaman semula. `next` hanya menerima path relatif satu situs.

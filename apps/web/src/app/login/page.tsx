@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
-import { type FormEvent, Suspense, useState } from "react";
+import { useRouter } from "next/navigation";
+import { type FormEvent, useEffect, useState } from "react";
 import { z } from "zod";
 import { StateBlock } from "@/components/ui";
 import { postJson } from "@/lib/api";
@@ -15,8 +15,9 @@ const DEMO_PASSWORD = "Dummy-Demo-Pass-123";
 
 function LoginForm() {
   const router = useRouter();
-  const params = useSearchParams();
-  const expired = params.get("expired") === "1";
+  // Read from the address bar after mount so the form itself is rendered by the server (no blank page before hydration).
+  const [expired, setExpired] = useState(false);
+  useEffect(() => setExpired(new URLSearchParams(window.location.search).get("expired") === "1"), []);
   const [mode, setMode] = useState<"masuk" | "daftar">("masuk");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -36,7 +37,7 @@ function LoginForm() {
       if (mode === "masuk") await postJson("/api/auth/sign-in/email", { email, password }, AnyJson);
       else
         await postJson("/api/auth/sign-up/email", { email, password, name: name.trim() || email }, AnyJson);
-      router.replace(safeNext(params.get("next")));
+      router.replace(safeNext(new URLSearchParams(window.location.search).get("next")));
     } catch (err) {
       setError(describeError(err));
       setPassword("");
@@ -179,9 +180,5 @@ function LoginForm() {
 }
 
 export default function LoginPage() {
-  return (
-    <Suspense fallback={null}>
-      <LoginForm />
-    </Suspense>
-  );
+  return <LoginForm />;
 }
