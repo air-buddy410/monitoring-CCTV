@@ -134,5 +134,6 @@ export type AdapterErrorCode =
   | "device_protocol_error"
   | "snapshot_channel_not_found"
   | "snapshot_uri_host_mismatch"
+  | "snapshot_uri_port_not_allowed"
   | "snapshot_invalid_image"
   | "snapshot_failed";

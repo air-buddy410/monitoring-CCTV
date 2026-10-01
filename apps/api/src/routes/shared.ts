@@ -6,6 +6,7 @@ export const errorResponses = {
   403: ProblemSchema,
   404: ProblemSchema,
   422: ProblemSchema,
+  429: ProblemSchema,
   502: ProblemSchema,
   504: ProblemSchema,
 } as const;

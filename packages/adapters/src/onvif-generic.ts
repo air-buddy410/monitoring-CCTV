@@ -180,6 +180,9 @@ export async function snapshot(conn: DeviceConn, channel: string): Promise<Buffe
     if (!["http:", "https:"].includes(uri.protocol) || !sameHost(uri.hostname, conn.host)) {
       throw new AdapterError("snapshot_uri_host_mismatch");
     }
+    // Same host only, and only the web ports (or the ONVIF port the operator already chose).
+    const port = uri.port ? Number(uri.port) : uri.protocol === "https:" ? 443 : 80;
+    if (![80, 443, conn.port].includes(port)) throw new AdapterError("snapshot_uri_port_not_allowed");
     return await fetchJpeg(uri, conn);
   } catch (e) {
     throw mapError(e);

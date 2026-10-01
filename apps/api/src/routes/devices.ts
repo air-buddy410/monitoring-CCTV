@@ -14,7 +14,7 @@ import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import type { Deps } from "../app";
 import { writeAudit } from "../audit";
-import { AppError, fromAdapterCode, notFound } from "../errors";
+import { AppError, fromAdapterCode, notFound, rateLimited } from "../errors";
 import { toCamera, toDevice } from "../mappers";
 import { checkTarget } from "../target-policy";
 import { requireRole } from "../tenant";
@@ -40,6 +40,7 @@ export function deviceRoutes(app: FastifyInstance, deps: Deps) {
     async (req, reply) => {
       const t = requireRole(req, "operator");
       const body = req.body;
+      const gate = deps.limiter.hit(`probe:${t.orgId}:${t.userId}`, config.rateLimit.probe);
 
       const fail = async (err: AppError) => {
         await withTenant(handle.db, t.orgId, (tx) =>
@@ -52,7 +53,12 @@ export function deviceRoutes(app: FastifyInstance, deps: Deps) {
         throw err;
       };
 
-      const policy = checkTarget(body.host, { allowLoopback: config.allowLoopbackTargets });
+      if (!gate.allowed) return fail(rateLimited(gate.retryAfterSec));
+
+      const policy = checkTarget(body.host, {
+        allowLoopback: config.allowLoopbackTargets,
+        allowCidrs: config.targetAllowCidrs,
+      });
       if (!policy.allowed) {
         return fail(
           new AppError(422, "target_not_allowed", "This address cannot be used as a device target"),

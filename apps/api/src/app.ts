@@ -10,8 +10,9 @@ import {
   type ZodTypeProvider,
 } from "fastify-type-provider-zod";
 import type { Config } from "./config";
-import { AppError } from "./errors";
+import { AppError, rateLimited } from "./errors";
 import { createLogger } from "./logger";
+import { createRateLimiter, type RateLimiter } from "./rate-limit";
 import { auditRoutes } from "./routes/audit";
 import { deviceRoutes } from "./routes/devices";
 import { healthRoutes } from "./routes/health";
@@ -25,6 +26,7 @@ export interface Deps {
   handle: DbHandle;
   vault: Vault;
   resolveTenant: ReturnType<typeof createTenantResolver>;
+  limiter: RateLimiter;
 }
 export interface BuiltApp {
   app: FastifyInstance;
@@ -34,6 +36,9 @@ export interface BuiltApp {
 export type { Role };
 
 const PROBLEM = "application/problem+json";
+// endpoints that verify or set a password: throttled per client address and per account
+const CREDENTIAL_PATHS =
+  /^\/api\/auth\/(sign-in|sign-up|forget-password|reset-password|change-password)(\/|$)/;
 
 export async function buildApp(opts: {
   config: Config;
@@ -41,12 +46,20 @@ export async function buildApp(opts: {
 }): Promise<BuiltApp> {
   const { config } = opts;
   const handle = createDb(config.databaseUrl);
-  const auth = createAuth({ db: handle.db, secret: config.authSecret, baseURL: config.baseUrl });
+  const auth = createAuth({
+    db: handle.db,
+    secret: config.authSecret,
+    baseURL: config.baseUrl,
+    trustedOrigins: config.trustedOrigins,
+  });
+  const limiter = createRateLimiter({ windowMs: config.rateLimit.windowMs });
+  const trusted = new Set(config.trustedOrigins);
   const vault = createVault(config.vaultKey);
 
   const app = Fastify({
     loggerInstance: createLogger(config.logLevel, opts.logStream),
     genReqId: () => crypto.randomUUID(),
+    trustProxy: config.trustProxy,
   });
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
@@ -77,6 +90,18 @@ export async function buildApp(opts: {
     transform: jsonSchemaTransform,
   });
 
+  // CSRF: state-changing requests must come from a trusted origin. Browsers always send Origin on
+  // cross-origin writes, so a present-but-untrusted Origin (or Sec-Fetch-Site: cross-site) is rejected.
+  // Requests with neither header are non-browser clients and cannot be forged through a victim's browser.
+  app.addHook("onRequest", async (req) => {
+    if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return;
+    const origin = req.headers.origin;
+    const fetchSite = req.headers["sec-fetch-site"];
+    if (fetchSite === "cross-site" || (origin !== undefined && !trusted.has(origin))) {
+      throw new AppError(403, "csrf_origin_rejected", "Request origin is not trusted");
+    }
+  });
+
   app.setErrorHandler((err, req, reply) => {
     let problem: AppError;
     if (err instanceof AppError) problem = err;
@@ -90,6 +115,7 @@ export async function buildApp(opts: {
       req.log.error({ errName: (err as Error).name }, "unhandled error");
       problem = new AppError(500, "internal_error", "Internal server error");
     }
+    if (problem.retryAfterSec) reply.header("retry-after", String(problem.retryAfterSec));
     reply
       .status(problem.status)
       .header("content-type", PROBLEM)
@@ -119,6 +145,14 @@ export async function buildApp(opts: {
     schema: { hide: true },
     handler: async (req, reply) => {
       const url = new URL(req.url, `http://${req.headers.host ?? "localhost"}`);
+      if (req.method === "POST" && CREDENTIAL_PATHS.test(url.pathname)) {
+        const email = (req.body as { email?: unknown } | null)?.email;
+        const keys = [`auth:ip:${req.ip}`];
+        if (typeof email === "string") keys.push(`auth:email:${email.trim().toLowerCase().slice(0, 254)}`);
+        const results = keys.map((k) => limiter.hit(k, config.rateLimit.auth));
+        const blocked = results.find((r) => !r.allowed);
+        if (blocked) throw rateLimited(blocked.retryAfterSec);
+      }
       const headers = headersFromNode(req.headers);
       headers.delete("content-length");
       const hasBody = req.method !== "GET" && req.body !== undefined && req.body !== null;
@@ -139,7 +173,7 @@ export async function buildApp(opts: {
     },
   });
 
-  const deps: Deps = { config, handle, vault, resolveTenant: createTenantResolver(auth, handle.db) };
+  const deps: Deps = { config, handle, vault, limiter, resolveTenant: createTenantResolver(auth, handle.db) };
   app.get("/docs/json", { schema: { hide: true } }, async () => app.swagger());
   healthRoutes(app, deps);
   siteRoutes(app, deps);

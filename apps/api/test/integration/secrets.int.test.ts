@@ -1,5 +1,4 @@
-import { execFileSync } from "node:child_process";
-import { afterAll, beforeAll, describe, expect, inject, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   addDevice,
   createSite,
@@ -90,12 +89,22 @@ describe("device password never leaks", () => {
     expect(all).not.toContain(USER_PASSWORD);
   });
 
-  it("is absent from the whole database dump (stored only as AES-GCM ciphertext)", () => {
-    const dump = execFileSync("pg_dump", ["--data-only", "--inserts", inject("dbUrls").admin], {
-      encoding: "utf8",
-      maxBuffer: 64 * 1024 * 1024,
-    });
-    expect(dump).toContain("INSERT INTO public.device_secret");
+  it("is absent from every row of every table (stored only as AES-GCM ciphertext)", async () => {
+    // Version-independent replacement for pg_dump (which refuses servers newer than the client).
+    const tables = await env.admin.query<{ table_name: string }>(
+      `select table_name from information_schema.tables
+       where table_schema = 'public' and table_type = 'BASE TABLE' order by 1`,
+    );
+    expect(tables.rows.map((t) => t.table_name)).toContain("device_secret");
+    let dump = "";
+    const counts: Record<string, number> = {};
+    for (const { table_name } of tables.rows) {
+      const rows = await env.admin.query<{ r: string }>(`select t::text as r from "${table_name}" t`);
+      counts[table_name] = rows.rowCount ?? 0;
+      dump += rows.rows.map((x) => x.r).join("\n");
+    }
+    expect(counts.device_secret).toBeGreaterThan(0);
+    expect(counts.audit_log).toBeGreaterThan(0);
     expect(dump).not.toContain(DEVICE_PASSWORD);
     expect(dump).not.toContain(USER_PASSWORD);
     // the base64 of the password must not be there either

@@ -9,6 +9,8 @@ import { loadConfig } from "../src/config";
 /** Dummy sentinel; any appearance in responses/logs/DB dumps is a leak. */
 export const DEVICE_PASSWORD = "Dummy-Sentinel-Pw-7391!";
 export const DEVICE_USERNAME = "dummy-admin";
+/** Matches BASE_URL below. Cookie-bearing auth calls need a trusted Origin (CSRF protection). */
+export const ORIGIN = "http://localhost:3000";
 export const USER_PASSWORD = "Dummy-User-Login-Pw-5521!";
 
 export interface TestEnv {
@@ -39,6 +41,10 @@ export async function createTestEnv(overrides: Record<string, string> = {}): Pro
     ONVIF_TIMEOUT_MS: "1500",
     SNAPSHOT_TIMEOUT_MS: "1500",
     LOG_LEVEL: "debug",
+    // generous by default so ordinary tests are not throttled; rate-limit tests override these
+    RATE_LIMIT_PROBE_PER_MIN: "1000",
+    RATE_LIMIT_SNAPSHOT_PER_MIN: "1000",
+    RATE_LIMIT_AUTH_PER_MIN: "1000",
     ...overrides,
   });
   const built = await buildApp({ config, logStream });
@@ -94,7 +100,7 @@ export async function createTenant(env: TestEnv, label: string): Promise<Tenant>
   const org = await app.inject({
     method: "POST",
     url: "/api/auth/organization/create",
-    headers: { cookie },
+    headers: { cookie, origin: ORIGIN },
     payload: { name: `Org ${label}`, slug: `org-${label}-${randomUUID().slice(0, 8)}` },
   });
   if (org.statusCode !== 200) throw new Error(`org create failed ${org.statusCode}: ${org.body}`);
@@ -102,7 +108,7 @@ export async function createTenant(env: TestEnv, label: string): Promise<Tenant>
   const setActive = await app.inject({
     method: "POST",
     url: "/api/auth/organization/set-active",
-    headers: { cookie },
+    headers: { cookie, origin: ORIGIN },
     payload: { organizationId: orgId },
   });
   if (setActive.statusCode !== 200) throw new Error(`set-active failed ${setActive.statusCode}`);
@@ -124,7 +130,7 @@ export async function addMemberWithRole(
   const setActive = await env.built.app.inject({
     method: "POST",
     url: "/api/auth/organization/set-active",
-    headers: { cookie: other.cookie },
+    headers: { cookie: other.cookie, origin: ORIGIN },
     payload: { organizationId: org.orgId },
   });
   if (setActive.statusCode !== 200) throw new Error(`set-active failed ${setActive.statusCode}`);
