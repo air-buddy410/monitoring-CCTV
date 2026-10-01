@@ -52,5 +52,11 @@ describe("agent environment", () => {
       localPort: 9000,
     });
     expect(() => loadAgentEnv({ ...base, PANTAU_LOCAL_PORT: "99999" })).toThrow(/PANTAU_LOCAL_PORT/);
+    expect(
+      loadAgentEnv({ ...base, PANTAU_LOCAL_TLS_CERT: "/c.pem", PANTAU_LOCAL_TLS_KEY: "/k.pem" }),
+    ).toMatchObject({
+      localTlsCert: "/c.pem",
+      localTlsKey: "/k.pem",
+    });
   });
 });

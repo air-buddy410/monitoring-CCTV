@@ -45,7 +45,7 @@ Tes baru ditulis lebih dulu dan terbukti merah (modul tidak ada atau mutasi) seb
 1. Bukti lapangan: tidak ada kamera nyata. WS-Discovery belum pernah menerima jawaban dari perangkat sungguhan; perilaku multicast di switch, VLAN, dan antarmuka ganda belum diketahui.
 2. Docker: tidak ada daemon, image tidak pernah dibangun; digest dasar belum dipin. systemd: unit tidak dimuat di host.
 3. go2rtc: tanpa supervisor, tanpa biner asli, tanpa alur live ke penonton. Hanya aturan loopback dan klien yang terbukti.
-4. Onboarding lokal berjalan di `http` biasa; bind LAN mengirim PIN dan sandi tanpa TLS (D35).
+4. Bind onboarding di luar loopback kini ditolak tanpa TLS (tes negatif). Jalur TLS hanya diuji di loopback dengan sertifikat swa-tanda tangan; belum di antarmuka LAN nyata (D35).
 5. Kehadiran agen masih satu proses API (D25).
 6. Node 24 dan PostgreSQL 17 belum dijalankan untuk keadaan ini.
 7. Hik-Connect: rencana yang belum dibuktikan. Tidak ada kode, akun, atau API vendor.
@@ -55,7 +55,7 @@ Tes baru ditulis lebih dulu dan terbukti merah (modul tidak ada atau mutasi) seb
 
 1. Izin commit dan push untuk `claude/pantau-w3-m2-rest` (cabang baru dari `e45e70e`, dibuka sebagai PR draft)? Tanpa itu kerja ini tidak tersimpan di luar sesi.
 2. PR #4 (Rex) dan PR #5 bentrok: mana yang dipertahankan?
-3. Bolehkah bind onboarding lokal ke IP LAN dipakai di produksi, atau wajib lewat TLS atau terowongan lebih dulu?
+3. (Terjawab: produksi tetap loopback, jarak jauh wajib TLS atau terowongan; diterapkan.)
 4. Vitest 3 ke 4: setuju atau tidak?
 
 Status: NEEDS_INPUT (izin commit dan push). Bukan izin merge atau deploy.

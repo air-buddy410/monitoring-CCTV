@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, readdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -90,6 +91,61 @@ describe("local onboarding server: binding", () => {
     await expect(startLocalUi({ registry, pin: PIN, discover: async () => [], bindHost })).rejects.toThrow(
       /bind/,
     );
+  });
+  it("refuses a LAN bind without TLS: no plaintext PIN or password on the network", async () => {
+    const { registry } = await setup();
+    for (const bindHost of ["192.168.1.10", "10.0.0.5", "172.16.3.4"])
+      await expect(startLocalUi({ registry, pin: PIN, discover: async () => [], bindHost })).rejects.toThrow(
+        /TLS/,
+      );
+  });
+  it("serves https with Secure cookies when TLS is given, and enforces the https origin", async () => {
+    const { registry } = await setup();
+    const dir = mkdtempSync(join(tmpdir(), "pantau-tls-"));
+    const [key, cert] = [join(dir, "k.pem"), join(dir, "c.pem")];
+    execFileSync(
+      "openssl",
+      [
+        "req",
+        "-x509",
+        "-newkey",
+        "rsa:2048",
+        "-nodes",
+        "-keyout",
+        key,
+        "-out",
+        cert,
+        "-days",
+        "1",
+        "-subj",
+        "/CN=127.0.0.1",
+      ],
+      { stdio: "ignore" },
+    );
+    const ui = await startLocalUi({
+      registry,
+      pin: PIN,
+      discover: async () => [],
+      tls: { cert: readFileSync(cert), key: readFileSync(key) },
+    });
+    cleanups.push(() => ui.close());
+    expect(ui.url).toMatch(/^https:\/\/127\.0\.0\.1:\d+$/);
+    // Simulasi: self-signed lab certificate
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+    try {
+      const login = (origin: string) =>
+        fetch(`${ui.url}/api/login`, {
+          method: "POST",
+          headers: { "content-type": "application/json", origin },
+          body: JSON.stringify({ pin: PIN }),
+        });
+      const ok = await login(ui.url);
+      expect(ok.status).toBe(200);
+      expect(ok.headers.getSetCookie()[0]).toMatch(/; Secure/);
+      expect((await login(ui.url.replace("https", "http"))).status).toBe(403);
+    } finally {
+      delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+    }
   });
   it("refuses a short or non-numeric pin", async () => {
     const { registry } = await setup();

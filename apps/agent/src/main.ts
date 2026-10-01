@@ -1,4 +1,5 @@
 import { randomInt } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { Agent } from "./agent";
 import { DeviceError } from "./devices";
 import { discover } from "./discovery";
@@ -17,7 +18,8 @@ const USAGE = `pantau-agent <command>
   run           connect to the cloud and stay connected
 
 Environment: PANTAU_API_URL (required), PANTAU_AGENT_DATA_DIR, PANTAU_AGENT_NAME, PANTAU_WS_URL,
-PANTAU_LOG_LEVEL, PANTAU_LOCAL_BIND (default 127.0.0.1), PANTAU_LOCAL_PORT (default 8780). Lab only: PANTAU_ALLOW_LOOPBACK=true, PANTAU_ALLOW_INSECURE=true.
+PANTAU_LOG_LEVEL, PANTAU_LOCAL_BIND (default 127.0.0.1), PANTAU_LOCAL_PORT (default 8780),
+PANTAU_LOCAL_TLS_CERT and PANTAU_LOCAL_TLS_KEY (required for any bind beyond loopback). Lab only: PANTAU_ALLOW_LOOPBACK=true, PANTAU_ALLOW_INSECURE=true.
 `;
 
 async function main(): Promise<number> {
@@ -61,6 +63,9 @@ async function main(): Promise<number> {
       pin,
       bindHost: env.localBind,
       port: env.localPort,
+      ...(env.localTlsCert && env.localTlsKey
+        ? { tls: { cert: readFileSync(env.localTlsCert), key: readFileSync(env.localTlsKey) } }
+        : {}),
       discover: () => discover({ allowLoopback: env.allowLoopback }),
     });
     // the PIN goes to the console only: not to the logger, a file or the cloud

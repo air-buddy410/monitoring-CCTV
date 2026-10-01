@@ -1,5 +1,6 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { createServer as createTlsServer } from "node:https";
 import type { AddressInfo } from "node:net";
 import { checkTarget } from "@pantau/adapters";
 import { z } from "zod";
@@ -21,6 +22,8 @@ export interface LocalUiOptions {
   /** Loopback by default. A LAN address must be named explicitly; wildcard and public addresses are refused. */
   bindHost?: string;
   port?: number;
+  /** Required for any non-loopback bind: the PIN and the device password must never cross the LAN in plaintext. */
+  tls?: { cert: string | Buffer; key: string | Buffer };
   lockMs?: number;
   /** Called after a device was added or removed, so the cloud inventory can be synced. */
   onChange?: () => void | Promise<void>;
@@ -79,6 +82,10 @@ export async function startLocalUi(o: LocalUiOptions): Promise<LocalUi> {
   const bindHost = o.bindHost ?? "127.0.0.1";
   if (!checkTarget(bindHost, { allowLoopback: true }).allowed)
     throw new Error("bind address must be loopback or a private LAN address");
+  const loopbackBind = bindHost === "::1" || bindHost.startsWith("127.");
+  if (!loopbackBind && !o.tls)
+    throw new Error("bind beyond loopback needs TLS; use a secure tunnel to the loopback address instead");
+  const scheme = o.tls ? "https" : "http";
   if (!/^\d{6,12}$/.test(o.pin)) throw new Error("pin must be 6 to 12 digits");
   const lockMs = o.lockMs ?? 60_000;
 
@@ -125,7 +132,7 @@ export async function startLocalUi(o: LocalUiOptions): Promise<LocalUi> {
 
   const handle = async (req: IncomingMessage, res: ServerResponse) => {
     if (!hostOk(req.headers.host)) throw new HttpError(421, "misdirected_request");
-    const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
+    const url = new URL(req.url ?? "/", `${scheme}://${req.headers.host}`);
     const method = req.method ?? "GET";
     const isWrite = method !== "GET" && method !== "HEAD";
 
@@ -144,7 +151,7 @@ export async function startLocalUi(o: LocalUiOptions): Promise<LocalUi> {
     }
     if (!url.pathname.startsWith("/api/")) throw new HttpError(404, "not_found");
 
-    if (isWrite && req.headers.origin !== `http://${req.headers.host}`)
+    if (isWrite && req.headers.origin !== `${scheme}://${req.headers.host}`)
       throw new HttpError(403, "origin_not_allowed");
 
     if (method === "POST" && url.pathname === "/api/login") {
@@ -169,7 +176,7 @@ export async function startLocalUi(o: LocalUiOptions): Promise<LocalUi> {
         200,
         { csrf },
         {
-          "set-cookie": `${COOKIE}=${sid}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL_MS / 1000}`,
+          "set-cookie": `${COOKIE}=${sid}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL_MS / 1000}${o.tls ? "; Secure" : ""}`,
         },
       );
       return;
@@ -221,14 +228,15 @@ export async function startLocalUi(o: LocalUiOptions): Promise<LocalUi> {
     throw new HttpError(404, "not_found");
   };
 
-  const server: Server = createServer((req, res) => {
+  const listener = (req: IncomingMessage, res: ServerResponse) => {
     handle(req, res).catch((e: unknown) => {
       if (res.headersSent) return res.end();
       if (e instanceof HttpError) return send(res, e.status, { code: e.code }, e.headers);
       // internal detail stays out of the response: it can hold request data
       send(res, 500, { code: "internal_error" });
     });
-  });
+  };
+  const server: Server = o.tls ? createTlsServer(o.tls, listener) : createServer(listener);
   server.requestTimeout = 15_000;
   server.headersTimeout = 10_000;
 
@@ -239,7 +247,7 @@ export async function startLocalUi(o: LocalUiOptions): Promise<LocalUi> {
   port = (server.address() as AddressInfo).port;
   const shown = bindHost.includes(":") ? `[${bindHost}]` : bindHost;
   return {
-    url: `http://${shown}:${port}`,
+    url: `${scheme}://${shown}:${port}`,
     close: () =>
       new Promise<void>((resolve) => {
         server.closeAllConnections();

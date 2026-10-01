@@ -58,6 +58,11 @@ describe("agent deployment files (static checks: no image is built here)", () =>
     expect(envBlock).toContain("PANTAU_API_URL");
     expect(envBlock).not.toMatch(/TOKEN|PASSWORD/i);
   });
+  it("no deployment file points the setup page beyond loopback", () => {
+    for (const f of FILES) {
+      for (const m of read(f).matchAll(/PANTAU_LOCAL_BIND[=:]\s*(\S+)/g)) expect(m[1], f).toBe("127.0.0.1");
+    }
+  });
   it("the go2rtc config the agent writes is loopback only", () => {
     expect(buildGo2rtcConfig()).not.toContain("0.0.0.0");
   });
