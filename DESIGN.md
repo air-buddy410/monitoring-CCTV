@@ -78,7 +78,7 @@ Sidebar dengan empat kartu statistik, grafik tanpa pertanyaan, umpan aktivitas, 
 
 ## Ikon
 
-Hanya empat glif gambar sendiri (cari, tutup, ulangi, layar penuh) dengan sudut runcing dan goresan 2 px, ditambah tiga penanda status (terbukti, tidak ada, belum diuji) berbentuk berbeda. Kegunaan tiap glif ditulis di komponennya.
+Enam glif gambar sendiri (cari, tutup, ulangi, layar penuh, unduh, peringatan) dengan sudut runcing dan goresan 2 px, ditambah tiga penanda status (terbukti, tidak ada, belum diuji) berbentuk berbeda: centang, silang, cincin putus-putus. Kegunaan tiap glif ditulis di `apps/web/src/components/glyphs.tsx`.
 
 ## Gerak
 
