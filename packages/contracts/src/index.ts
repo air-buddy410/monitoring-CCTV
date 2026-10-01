@@ -132,6 +132,29 @@ export const AuditQuery = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 
+// ---- camera grants (PRD F7: per-camera narrowing of the tenant role) ----
+export const GrantScope = z.enum(["site", "camera"]);
+export const GrantPermission = z.enum(["view", "operate"]);
+export const GrantCreate = z
+  .object({
+    userId: z.string().min(1).max(100),
+    scope: GrantScope,
+    scopeId: z.string().min(1).max(100),
+    permission: GrantPermission,
+  })
+  .strict();
+export type GrantCreate = z.infer<typeof GrantCreate>;
+export const Grant = z.object({
+  id: z.string(),
+  userId: z.string(),
+  scope: GrantScope,
+  scopeId: z.string(),
+  permission: GrantPermission,
+  createdAt: z.string(),
+});
+export type Grant = z.infer<typeof Grant>;
+export const GrantList = z.object({ items: z.array(Grant) });
+
 /** Result of probing a device through an adapter. Contains no credentials. */
 export interface ProbedChannel {
   channel: string;

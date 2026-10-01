@@ -15,6 +15,7 @@ import { createLogger } from "./logger";
 import { createRateLimiter, type RateLimiter } from "./rate-limit";
 import { auditRoutes } from "./routes/audit";
 import { deviceRoutes } from "./routes/devices";
+import { grantRoutes } from "./routes/grants";
 import { healthRoutes } from "./routes/health";
 import { siteRoutes } from "./routes/sites";
 import { snapshotRoutes } from "./routes/snapshot";
@@ -79,6 +80,7 @@ export async function buildApp(opts: {
         { name: "devices" },
         { name: "cameras" },
         { name: "audit" },
+        { name: "grants" },
       ],
       components: {
         securitySchemes: {
@@ -180,6 +182,7 @@ export async function buildApp(opts: {
   deviceRoutes(app, deps);
   snapshotRoutes(app, deps);
   auditRoutes(app, deps);
+  grantRoutes(app, deps);
 
   app.withTypeProvider<ZodTypeProvider>();
   return {

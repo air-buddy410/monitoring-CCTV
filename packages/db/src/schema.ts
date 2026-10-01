@@ -114,6 +114,15 @@ export const camera = pgTable("camera", {
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+export const cameraGrant = pgTable("camera_grant", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id").notNull(),
+  userId: text("user_id").notNull(),
+  scope: text("scope").notNull(),
+  scopeId: text("scope_id").notNull(),
+  permission: text("permission").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
 export const auditLog = pgTable("audit_log", {
   id: text("id").primaryKey(),
   organizationId: text("organization_id").notNull(),
