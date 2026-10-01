@@ -1,0 +1,24 @@
+# Host networking lets the agent reach cameras and WS-Discovery multicast on the LAN.
+# The setup page and go2rtc bind 127.0.0.1 only, so nothing is published on the LAN or the internet.
+services:
+  pantau-agent:
+    image: pantau-agent:local
+    build:
+      context: ../..
+      dockerfile: deploy/agent/Dockerfile
+    network_mode: host
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      PANTAU_API_URL: ${PANTAU_API_URL:?set the https URL of the PANTAU API}
+      PANTAU_LOCAL_BIND: 127.0.0.1
+    volumes:
+      - pantau-agent-data:/var/lib/pantau-agent
+volumes:
+  pantau-agent-data:

@@ -178,6 +178,24 @@ export async function createSite(env: TestEnv, t: Tenant, name = "Site Dummy") {
   return res.json() as { id: string };
 }
 
+/** Give a member access through the real API, as the tenant owner would. Default is deny for operator and viewer. */
+export async function giveAccess(
+  env: TestEnv,
+  owner: Tenant,
+  userId: string,
+  scope: "site" | "camera",
+  scopeId: string,
+  permission: "view" | "operate",
+): Promise<void> {
+  const res = await env.built.app.inject({
+    method: "POST",
+    url: "/v1/grants",
+    headers: { cookie: owner.cookie },
+    payload: { userId, scope, scopeId, permission },
+  });
+  if (res.statusCode !== 201) throw new Error(`grant failed ${res.statusCode}: ${res.body}`);
+}
+
 export async function addDevice(
   env: TestEnv,
   t: Tenant,

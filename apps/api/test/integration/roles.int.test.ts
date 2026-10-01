@@ -5,6 +5,7 @@ import {
   createSite,
   createTenant,
   createTestEnv,
+  giveAccess,
   ORIGIN,
   type Tenant,
   type TestEnv,
@@ -40,6 +41,9 @@ describe("role matrix (owner / operator / viewer)", () => {
       payload: { userId: operator.userId, scope: "camera", scopeId: cameraId, permission: "operate" },
     });
     expect(granted.statusCode).toBe(201);
+    // Inventory is default-deny too: operator may operate the site, viewer may view it.
+    await giveAccess(env, owner, operator.userId, "site", siteId, "operate");
+    await giveAccess(env, owner, viewer.userId, "site", siteId, "view");
   });
   afterAll(async () => env.close());
 

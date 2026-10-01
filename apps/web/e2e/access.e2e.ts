@@ -24,6 +24,8 @@ test("penonton hanya melihat: tidak ada aksi terlarang, server menolak jika dipa
   const owner = await newTenant("own");
   const viewer = await newMember(owner, "viewer", "member");
   const { device, cameras } = await seedDevice(owner, mock);
+  // Default-deny: the viewer sees nothing until the owner grants the site.
+  await grantAccess(owner, viewer.userId, "site", device.siteId, "view");
   await signInAs(context, viewer);
   const w = watch(page, [403]);
 
@@ -66,6 +68,8 @@ test("operator menambah perangkat dan mengambil snapshot, tetapi tidak membaca a
   const { device, cameras } = await seedDevice(owner, mock, "Milik Pemilik");
   // Video access is default-deny for operators: the owner grants this camera first.
   await grantAccess(owner, operator.userId, "camera", cameras[0]?.id as string, "operate");
+  // Adding a device needs operate on the site it goes into.
+  await grantAccess(owner, operator.userId, "site", device.siteId, "operate");
   await signInAs(context, operator);
   const w = watch(page, [403]);
 

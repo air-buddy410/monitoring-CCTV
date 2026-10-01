@@ -5,6 +5,7 @@ import {
   createSite,
   createTenant,
   createTestEnv,
+  giveAccess,
   type Tenant,
   type TestEnv,
 } from "../helpers";
@@ -83,6 +84,7 @@ describe("PATCH/DELETE /v1/sites/:id and PATCH /v1/cameras/:id", () => {
 
     it("role matrix: viewer 403, operator and noc and owner may patch; delete is owner or noc only", async () => {
       const s = await createSite(env, owner);
+      await giveAccess(env, owner, operator.userId, "site", s.id, "operate");
       expect((await inject(null, "PATCH", `/v1/sites/${s.id}`, { name: "a" })).statusCode).toBe(401);
       expect((await inject(viewer, "PATCH", `/v1/sites/${s.id}`, { name: "a" })).statusCode).toBe(403);
       expect((await inject(operator, "PATCH", `/v1/sites/${s.id}`, { name: "b" })).statusCode).toBe(200);
@@ -181,6 +183,7 @@ describe("PATCH/DELETE /v1/sites/:id and PATCH /v1/cameras/:id", () => {
     });
 
     it("role matrix: viewer 403, operator, noc and owner allowed", async () => {
+      await giveAccess(env, owner, operator.userId, "camera", cameraId, "operate");
       expect((await inject(null, "PATCH", `/v1/cameras/${cameraId}`, { name: "a" })).statusCode).toBe(401);
       expect((await inject(viewer, "PATCH", `/v1/cameras/${cameraId}`, { name: "a" })).statusCode).toBe(403);
       expect((await inject(operator, "PATCH", `/v1/cameras/${cameraId}`, { name: "b" })).statusCode).toBe(

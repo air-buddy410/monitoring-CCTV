@@ -20,6 +20,10 @@ const Env = z.object({
   PANTAU_WS_URL: url(["wss:", "ws:"]).optional(),
   PANTAU_AGENT_DATA_DIR: z.string().min(1).optional(),
   PANTAU_AGENT_NAME: z.string().min(1).max(120).optional(),
+  PANTAU_LOCAL_BIND: z.string().min(1).default("127.0.0.1"),
+  PANTAU_LOCAL_TLS_CERT: z.string().min(1).optional(),
+  PANTAU_LOCAL_TLS_KEY: z.string().min(1).optional(),
+  PANTAU_LOCAL_PORT: z.coerce.number().int().min(1).max(65535).default(8780),
   PANTAU_ALLOW_LOOPBACK: flag,
   PANTAU_ALLOW_INSECURE: flag,
   PANTAU_LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
@@ -30,6 +34,10 @@ export interface AgentEnv {
   wsUrl?: string;
   dataDir: string;
   name: string;
+  localBind: string;
+  localPort: number;
+  localTlsCert?: string;
+  localTlsKey?: string;
   allowLoopback: boolean;
   allowInsecure: boolean;
   logLevel: string;
@@ -49,6 +57,11 @@ export function loadAgentEnv(env: Record<string, string | undefined> = process.e
     ...(e.PANTAU_WS_URL ? { wsUrl: e.PANTAU_WS_URL } : {}),
     dataDir: resolve(e.PANTAU_AGENT_DATA_DIR ?? "pantau-agent-data"),
     name: e.PANTAU_AGENT_NAME ?? hostname(),
+    localBind: e.PANTAU_LOCAL_BIND,
+    localPort: e.PANTAU_LOCAL_PORT,
+    ...(e.PANTAU_LOCAL_TLS_CERT && e.PANTAU_LOCAL_TLS_KEY
+      ? { localTlsCert: e.PANTAU_LOCAL_TLS_CERT, localTlsKey: e.PANTAU_LOCAL_TLS_KEY }
+      : {}),
     allowLoopback: e.PANTAU_ALLOW_LOOPBACK,
     allowInsecure: e.PANTAU_ALLOW_INSECURE,
     logLevel: e.PANTAU_LOG_LEVEL,

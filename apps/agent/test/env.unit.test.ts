@@ -41,4 +41,22 @@ describe("agent environment", () => {
     });
     expect(c).toMatchObject({ dataDir: "/var/lib/pantau", name: "Mini PC", wsUrl: "wss://ws.a.test" });
   });
+
+  it("local setup page: loopback and port 8780 by default, both overridable", () => {
+    const base = { PANTAU_API_URL: "https://a.test" };
+    expect(loadAgentEnv(base)).toMatchObject({ localBind: "127.0.0.1", localPort: 8780 });
+    expect(
+      loadAgentEnv({ ...base, PANTAU_LOCAL_BIND: "192.168.1.10", PANTAU_LOCAL_PORT: "9000" }),
+    ).toMatchObject({
+      localBind: "192.168.1.10",
+      localPort: 9000,
+    });
+    expect(() => loadAgentEnv({ ...base, PANTAU_LOCAL_PORT: "99999" })).toThrow(/PANTAU_LOCAL_PORT/);
+    expect(
+      loadAgentEnv({ ...base, PANTAU_LOCAL_TLS_CERT: "/c.pem", PANTAU_LOCAL_TLS_KEY: "/k.pem" }),
+    ).toMatchObject({
+      localTlsCert: "/c.pem",
+      localTlsKey: "/k.pem",
+    });
+  });
 });

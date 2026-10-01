@@ -41,6 +41,8 @@ for (const scheme of SCHEMES) {
       const { device, cameras } = await seedDevice(owner, mock);
       await grantAccess(owner, operator.userId, "camera", cameras[0]?.id as string, "operate");
       await grantAccess(owner, viewer.userId, "camera", cameras[1]?.id as string, "view");
+      // view-only for the operator on the second camera: the explained "view only" state
+      await grantAccess(owner, operator.userId, "camera", cameras[1]?.id as string, "view");
       // arranged now: confirming 2FA later in this test replaces the owner's API session
       await enrollAgentViaApi(owner, "Agen Tata Letak");
 
@@ -123,12 +125,12 @@ for (const scheme of SCHEMES) {
         expectClean(await audit(page), `akses ${label} ${width} ${scheme}`);
       }
 
-      // operator without a grant on the camera: explained state in the snapshot stage
+      // operator with view-only on the camera: explained state in the snapshot stage
       await page.waitForLoadState("networkidle");
       await context.clearCookies();
       await signInAs(context, operator);
       await page.goto(`/perangkat?d=${device.id}&c=${cameras[1]?.id}`);
-      await expect(page.getByText("Anda belum diberi akses ke kamera ini.")).toBeVisible();
+      await expect(page.getByText("Akses Anda ke kamera ini hanya melihat.")).toBeVisible();
       expectClean(await audit(page), `snapshot tanpa akses ${width} ${scheme}`);
 
       expect(w.consoleErrors, w.consoleErrors.join("\n")).toEqual([]);

@@ -1,7 +1,11 @@
+import { randomInt } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { Agent } from "./agent";
 import { DeviceError } from "./devices";
+import { discover } from "./discovery";
 import { loadAgentEnv } from "./env";
 import { EnrollError } from "./identity";
+import { startLocalUi } from "./local-ui";
 import { createLogger } from "./logger";
 
 const USAGE = `pantau-agent <command>
@@ -10,10 +14,12 @@ const USAGE = `pantau-agent <command>
   add-device    probe a device on the LAN and keep its credentials in the local vault
                   usage: add-device <name> <host> [port]
                   credentials: PANTAU_DEVICE_USER and PANTAU_DEVICE_PASSWORD (never as arguments)
+  setup         open the local setup page (PIN printed here): find cameras and add them with their passwords
   run           connect to the cloud and stay connected
 
 Environment: PANTAU_API_URL (required), PANTAU_AGENT_DATA_DIR, PANTAU_AGENT_NAME, PANTAU_WS_URL,
-PANTAU_LOG_LEVEL. Lab only: PANTAU_ALLOW_LOOPBACK=true, PANTAU_ALLOW_INSECURE=true.
+PANTAU_LOG_LEVEL, PANTAU_LOCAL_BIND (default 127.0.0.1), PANTAU_LOCAL_PORT (default 8780),
+PANTAU_LOCAL_TLS_CERT and PANTAU_LOCAL_TLS_KEY (required for any bind beyond loopback). Lab only: PANTAU_ALLOW_LOOPBACK=true, PANTAU_ALLOW_INSECURE=true.
 `;
 
 async function main(): Promise<number> {
@@ -48,6 +54,26 @@ async function main(): Promise<number> {
     const d = await agent.registry.add({ name, host, port: port ? Number(port) : 80, username, password });
     console.log(`added ${d.deviceKey}: ${d.brand} ${d.model}, ${d.cameras.length} camera(s)`);
     return 0;
+  }
+  if (cmd === "setup") {
+    const agent = Agent.load(base);
+    const pin = String(randomInt(0, 100_000_000)).padStart(8, "0");
+    const ui = await startLocalUi({
+      registry: agent.registry,
+      pin,
+      bindHost: env.localBind,
+      port: env.localPort,
+      ...(env.localTlsCert && env.localTlsKey
+        ? { tls: { cert: readFileSync(env.localTlsCert), key: readFileSync(env.localTlsKey) } }
+        : {}),
+      discover: () => discover({ allowLoopback: env.allowLoopback }),
+    });
+    // the PIN goes to the console only: not to the logger, a file or the cloud
+    console.log(`setup page: ${ui.url}\nPIN: ${pin}\nPress Ctrl+C to close it.`);
+    const stop = () => void ui.close().then(() => process.exit(0));
+    process.on("SIGINT", stop);
+    process.on("SIGTERM", stop);
+    return -1;
   }
   if (cmd === "run") {
     const agent = Agent.load(base);

@@ -4,7 +4,10 @@ import {
   AgentOutbound,
   Envelope,
   FORBIDDEN_PAYLOAD_KEYS,
+  frameLimitFor,
   InventorySync,
+  MAX_FRAME_BYTES,
+  MAX_SNAPSHOT_FRAME_BYTES,
   parseEnvelope,
 } from "../src/agent";
 
@@ -186,5 +189,61 @@ describe("api to agent messages", () => {
         payload: { deviceKey: "d", channel: "1" },
       }).success,
     ).toBe(true);
+  });
+});
+
+describe("snapshot.request.result carries the JPEG", () => {
+  const ok = (jpegBase64: string) => ({
+    ...base,
+    type: "snapshot.request.result",
+    payload: { ok: true, jpegBase64 },
+  });
+
+  it("ok needs a base64 image within 1 MiB; a failure carries a code and no image", () => {
+    expect(AgentInbound.safeParse(ok(Buffer.from([0xff, 0xd8, 0xff, 0xd9]).toString("base64"))).success).toBe(
+      true,
+    );
+    expect(
+      AgentInbound.safeParse({ ...base, type: "snapshot.request.result", payload: { ok: true } }).success,
+    ).toBe(false);
+    expect(
+      AgentInbound.safeParse({
+        ...base,
+        type: "snapshot.request.result",
+        payload: { ok: false, code: "device_timeout" },
+      }).success,
+    ).toBe(true);
+    expect(
+      AgentInbound.safeParse({
+        ...base,
+        type: "snapshot.request.result",
+        payload: { ok: false, code: "x", jpegBase64: "AAAA" },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("refuses an image over 1 MiB and anything that is not base64", () => {
+    expect(AgentInbound.safeParse(ok(Buffer.alloc(1024 * 1024).toString("base64"))).success).toBe(true);
+    expect(AgentInbound.safeParse(ok(Buffer.alloc(1024 * 1024 + 1).toString("base64"))).success).toBe(false);
+    expect(AgentInbound.safeParse(ok("not base64 !!")).success).toBe(false);
+  });
+
+  it("only this message type may exceed the 128 KB frame limit", () => {
+    expect(MAX_SNAPSHOT_FRAME_BYTES).toBeGreaterThan(1024 * 1024);
+    expect(MAX_SNAPSHOT_FRAME_BYTES).toBeLessThan(2 * 1024 * 1024);
+    expect(MAX_FRAME_BYTES).toBe(128 * 1024);
+    expect(frameLimitFor("status")).toBe(MAX_FRAME_BYTES);
+    expect(frameLimitFor("inventory.sync")).toBe(MAX_FRAME_BYTES);
+    expect(frameLimitFor("snapshot.request.result")).toBe(MAX_SNAPSHOT_FRAME_BYTES);
+  });
+
+  it("parseEnvelope with the snapshot limit accepts a large result but the default limit does not", () => {
+    const text = JSON.stringify({
+      ...base,
+      type: "snapshot.request.result",
+      payload: { ok: true, jpegBase64: Buffer.alloc(300 * 1024).toString("base64") },
+    });
+    expect(parseEnvelope(text).ok).toBe(false);
+    expect(parseEnvelope(text, MAX_SNAPSHOT_FRAME_BYTES).ok).toBe(true);
   });
 });

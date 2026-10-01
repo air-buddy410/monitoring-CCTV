@@ -7,9 +7,11 @@ Multi-brand CCTV/VMS (PRD `PRD-LABS-PANTAU-002` v0.2). The repository now contai
 - **M1**: two-factor sign-in (TOTP and backup codes), per-camera grants, site and camera editing, audit action catalogue,
   `/healthz` and `/readyz`.
 - **M2 (started)**: `apps/agent`, the on-site agent (outbound WebSocket, local credential vault, inventory sync, status),
-  agent enrollment and revocation endpoints.
+  agent enrollment and revocation endpoints, snapshots through the agent, WS-Discovery, a local setup page
+  (`pantau-agent setup`, loopback by default), a loopback-only go2rtc config and client, and install files in `deploy/agent`
+  (static checks only: no image built, nothing tested on a real camera). See `docs/HASIL-GELOMBANG3.md`.
 
-Not included yet: live video, go2rtc, WebRTC, TURN, WS-Discovery, agent local onboarding UI, NVR playback, motion
+Not included yet: live video, go2rtc supervision, WebRTC, TURN, NVR playback, motion
 events, PWA, pg-boss worker, Hikvision/Dahua adapters, cross-tenant `noc`. **Nothing here has been tested against a
 physical camera**; every device in tests and demos is a labelled simulation.
 

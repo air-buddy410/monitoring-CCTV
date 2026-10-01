@@ -144,7 +144,10 @@ export async function seedDevice(t: Tenant, mock: MockOnvif, name = "Perangkat U
     }),
   });
   if (res.status !== 201) throw new Error(`seed device failed ${res.status}: ${await res.text()}`);
-  return (await res.json()) as { device: { id: string }; cameras: { id: string; name: string }[] };
+  return (await res.json()) as {
+    device: { id: string; siteId: string };
+    cameras: { id: string; name: string }[];
+  };
 }
 
 export interface Watch {

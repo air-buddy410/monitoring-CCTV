@@ -5,6 +5,7 @@ import { AgentClient, type ClientOptions } from "./client";
 import { DeviceRegistry } from "./devices";
 import { EnrollError, enroll, type Identity, loadIdentity } from "./identity";
 import { createLogger, type Logger } from "./logger";
+import { makeSnapshotHandler } from "./snapshot-handler";
 import { collectStatus, systemProbes, tcpReachable } from "./status";
 import { FileVault } from "./vault";
 
@@ -67,6 +68,12 @@ export class Agent {
       hello: () => ({ agentVersion: AGENT_VERSION, go2rtcVersion: null, hostname: hostname() }),
       inventory: () => this.registry.toInventory(),
       status: () => collectStatus({ devices: this.registry.list(), reachable, ...probes }),
+      handlers: {
+        "snapshot.request": makeSnapshotHandler({
+          registry: this.registry,
+          timeoutMs: cfg.probeTimeoutMs ?? 5000,
+        }),
+      },
       logger,
       ...cfg.client,
     });

@@ -37,6 +37,11 @@ export function containsForbiddenKey(value: unknown, depth = 0): boolean {
 }
 
 export const MAX_FRAME_BYTES = 128 * 1024;
+/** A snapshot travels in one frame, base64 inside JSON; this is the only message allowed past MAX_FRAME_BYTES. */
+export const MAX_SNAPSHOT_BYTES = 1024 * 1024;
+export const MAX_SNAPSHOT_FRAME_BYTES = Math.ceil(MAX_SNAPSHOT_BYTES / 3) * 4 + 2048;
+export const frameLimitFor = (type: string): number =>
+  type === "snapshot.request.result" ? MAX_SNAPSHOT_FRAME_BYTES : MAX_FRAME_BYTES;
 export const MAX_THUMBNAIL_BYTES = 20 * 1024;
 export const MAX_DEVICES_PER_SYNC = 64;
 export const MAX_CAMERAS_PER_DEVICE = 128;
@@ -164,6 +169,22 @@ export const MotionEvent = z
   .strict();
 
 const CommandResult = z.object({ ok: z.boolean(), code: z.string().max(64).optional() }).strict();
+const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
+export const SnapshotResult = z
+  .object({
+    ok: z.boolean(),
+    code: z.string().max(64).optional(),
+    jpegBase64: z
+      .string()
+      .regex(BASE64)
+      .refine((b) => decodedBytes(b) <= MAX_SNAPSHOT_BYTES, "snapshot over 1 MiB")
+      .optional(),
+  })
+  .strict()
+  .refine(
+    (r) => (r.ok ? r.jpegBase64 !== undefined : r.jpegBase64 === undefined),
+    "ok carries the image, a failure does not",
+  );
 
 export const AgentInbound = z.discriminatedUnion("type", [
   msg("hello", Hello),
@@ -171,7 +192,7 @@ export const AgentInbound = z.discriminatedUnion("type", [
   msg("status", StatusReport),
   msg("event.motion", MotionEvent),
   msg("ptz.command.result", CommandResult),
-  msg("snapshot.request.result", CommandResult),
+  msg("snapshot.request.result", SnapshotResult),
 ]);
 export type AgentInbound = z.infer<typeof AgentInbound>;
 

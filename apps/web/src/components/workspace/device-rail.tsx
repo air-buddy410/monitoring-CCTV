@@ -158,11 +158,15 @@ export function DeviceRail({ devices, cameras, sites, role, selectedId, onAdd, h
         {devices.length === 0 ? (
           <StateBlock
             kind="empty"
-            title="Belum ada perangkat di organisasi ini."
+            title={
+              can.manageGrants(role)
+                ? "Belum ada perangkat di organisasi ini."
+                : "Belum ada perangkat yang bisa Anda lihat."
+            }
             hint={
-              can.addDevice(role)
+              can.manageGrants(role)
                 ? "Siapkan alamat IP, port ONVIF, dan kredensial perangkat. Saat ditambahkan, PANTAU langsung melakukan probe."
-                : "Peran Anda hanya dapat melihat. Minta operator menambahkan perangkat."
+                : "Anda hanya melihat lokasi dan kamera yang diberi akses. Minta pemilik memberi akses di halaman Akses."
             }
             action={
               can.addDevice(role) ? (

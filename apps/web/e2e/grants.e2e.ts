@@ -58,8 +58,11 @@ test("pemilik memberi dan mencabut akses; operator mengikuti: tanpa akses ditola
   expect((await forced.json()).code).toBe("camera_not_granted");
   expect(mock.snapshotRequestCount()).toBe(before);
   await p.reload();
+  // Without any grant the device is not visible at all: not just a disabled button.
   await expect(p.getByRole("button", { name: /Ambil snapshot/ })).toHaveCount(0);
-  await expect(p.getByText("Anda belum diberi akses ke kamera ini.")).toBeVisible();
+  await expect(p.getByText("Perangkat ini tidak ditemukan di organisasi aktif.")).toBeVisible();
+  const list = await p.request.get("/v1/cameras");
+  expect((await list.json()).items).toEqual([]);
   expect(w.consoleErrors, w.consoleErrors.join("\n")).toEqual([]);
   await ownerCtx.close();
   await opCtx.close();
@@ -95,7 +98,7 @@ test("akses lokasi berlaku untuk semua kamera di lokasi itu; penonton hanya meli
   await mock.stop();
 });
 
-test("operator tanpa akses: tombol snapshot tidak ada dan penjelasan tampil; tabel akses menulis Tidak ada akses", async ({
+test("operator tanpa akses: perangkat dan kamera tidak tampil sama sekali, halaman Akses menjelaskannya", async ({
   page,
   context,
 }) => {
@@ -105,14 +108,15 @@ test("operator tanpa akses: tombol snapshot tidak ada dan penjelasan tampil; tab
   const { device, cameras } = await seedDevice(owner, mock);
   await signInAs(context, operator);
   const w = watch(page, [403]);
+  await page.goto("/perangkat");
+  await expect(page.getByText("Belum ada perangkat yang bisa Anda lihat.")).toBeVisible();
   await page.goto(`/perangkat?d=${device.id}`);
-  await expect(page.getByRole("region", { name: "Lembar probe" })).toBeVisible();
+  await expect(page.getByText("Perangkat ini tidak ditemukan di organisasi aktif.")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Lembar probe" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Ambil snapshot/ })).toHaveCount(0);
-  await expect(page.getByText("Anda belum diberi akses ke kamera ini.")).toBeVisible();
   await page.goto("/akses");
-  await expect(page.getByRole("row", { name: new RegExp(cameras[0]?.name as string) })).toContainText(
-    "Tidak ada akses",
-  );
+  await expect(page.getByText("Belum ada kamera yang diberi akses kepada Anda.")).toBeVisible();
+  await expect(page.getByText(cameras[0]?.name as string)).toHaveCount(0);
   expect(w.consoleErrors, w.consoleErrors.join("\n")).toEqual([]);
   await mock.stop();
 });

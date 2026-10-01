@@ -5,6 +5,7 @@ import {
   createSite,
   createTenant,
   createTestEnv,
+  giveAccess,
   type Tenant,
   type TestEnv,
 } from "../helpers";
@@ -111,6 +112,9 @@ describe("tenant isolation (API level)", () => {
 
   it("role enforcement inside a tenant: viewer cannot add devices or take snapshots", async () => {
     const viewer = await addMemberWithRole(env, a, "viewer-a", "member");
+    // default deny: a viewer sees the device only once the owner has granted its site
+    expect((await inject(viewer, "GET", `/v1/devices/${deviceId}`)).statusCode).toBe(404);
+    await giveAccess(env, a, viewer.userId, "site", siteA, "view");
     expect((await inject(viewer, "GET", `/v1/devices/${deviceId}`)).statusCode).toBe(200);
     const add = await addDevice(env, viewer, siteA, mock);
     expect(add.statusCode).toBe(403);
