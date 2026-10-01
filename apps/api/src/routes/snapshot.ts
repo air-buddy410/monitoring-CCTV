@@ -7,7 +7,7 @@ import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import type { Deps } from "../app";
 import { writeAudit } from "../audit";
-import { fromAdapterCode, notFound } from "../errors";
+import { fromAdapterCode, notFound, rateLimited } from "../errors";
 import { requireRole } from "../tenant";
 import { errorResponses } from "./shared";
 
@@ -29,6 +29,13 @@ export function snapshotRoutes(app: FastifyInstance, deps: Deps) {
     },
     async (req, reply) => {
       const t = requireRole(req, "operator");
+      const gate = deps.limiter.hit(`snapshot:${t.orgId}:${t.userId}`, config.rateLimit.snapshot);
+      if (!gate.allowed) {
+        await withTenant(handle.db, t.orgId, (tx) =>
+          writeAudit(tx, t, "camera.snapshot.failed", req.params.id, { reason: "rate_limited" }),
+        );
+        throw rateLimited(gate.retryAfterSec);
+      }
 
       const found = await withTenant(handle.db, t.orgId, async (tx) => {
         const rows = await tx

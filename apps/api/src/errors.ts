@@ -6,11 +6,15 @@ export class AppError extends Error {
     readonly code: string,
     readonly title: string,
     readonly detail?: string,
+    readonly retryAfterSec?: number,
   ) {
     super(title);
     this.name = "AppError";
   }
 }
+
+export const rateLimited = (retryAfterSec: number) =>
+  new AppError(429, "rate_limited", "Too many requests", undefined, retryAfterSec);
 
 export const notFound = (what: string) => new AppError(404, `${what}_not_found`, "Not Found");
 
@@ -26,6 +30,12 @@ export function fromAdapterCode(code: AdapterErrorCode): AppError {
       return new AppError(502, code, "Channel no longer exists on the device");
     case "snapshot_uri_host_mismatch":
       return new AppError(502, code, "Device advertised a snapshot address on a different host; refused");
+    case "snapshot_uri_port_not_allowed":
+      return new AppError(
+        502,
+        code,
+        "Device advertised a snapshot address on a port that is not allowed; refused",
+      );
     case "snapshot_invalid_image":
       return new AppError(502, code, "Device did not return a valid JPEG");
     default:

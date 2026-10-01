@@ -24,6 +24,8 @@ export function createAuth(opts: AuthOptions) {
       provider: "pg",
       schema: { user, session, account, verification, organization, member, invitation },
     }),
+    // Explicit: Better Auth otherwise disables the Origin/CSRF check whenever NODE_ENV === "test".
+    advanced: { disableOriginCheck: false },
     emailAndPassword: { enabled: true, minPasswordLength: 12, autoSignIn: true },
     plugins: [organizationPlugin()],
     logger: { level: "error" },

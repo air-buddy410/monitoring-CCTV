@@ -15,7 +15,7 @@ and `docs/HASIL-CLOUD.md` for verification results and known gaps.
 
 - Node.js >= 22 (PRD targets 24 LTS; `.nvmrc` says 24, verified here on 22.22)
 - pnpm 10 (`corepack enable`)
-- PostgreSQL >= 16 reachable locally (PRD targets 17; verified on 16.14), plus `pg_dump` on PATH (one test dumps the DB)
+- PostgreSQL >= 16 reachable locally (PRD targets 17; verified on 16.14 and 17.10, see `docs/HASIL-LANJUTAN.md`)
 
 ## Run it
 
@@ -72,6 +72,10 @@ curl -b $J localhost:3000/v1/audit
 | `GET /v1/audit` | tenant audit log (owner only) |
 | `GET /healthz`, `/readyz` | liveness, readiness (DB) |
 
+Security settings (see `.env.example`): `TARGET_ALLOW_CIDRS` (explicit device target allow-list; default private LAN ranges),
+`ALLOW_LOOPBACK_TARGETS` (lab exception), `TRUSTED_ORIGINS`, `TRUST_PROXY`, `RATE_LIMIT_*`. State-changing requests need a trusted
+`Origin` (or none, for non-browser clients); `/api/auth` calls with a session cookie must send `Origin`.
+
 Roles (Better Auth org roles → PRD roles): `owner`→owner, `admin`→operator, `member`→viewer.
 Add device / snapshot need operator+, audit needs owner, reads need any member.
 
@@ -90,7 +94,7 @@ Add device / snapshot need operator+, audit needs owner, reads need any member.
 
 Integration tests need PostgreSQL and (re)create the database `pantau_test`. They connect as superuser to
 `PANTAU_TEST_ADMIN_URL` (default `postgresql://postgres:postgres@127.0.0.1:5432/postgres`; `pnpm db:setup` sets that
-dummy password). They never contact anything except the in-process mock on 127.0.0.1.
+dummy password). They never contact anything except in-process mocks/decoys on 127.0.0.1. CI (`.github/workflows/ci.yml`) runs the same commands on Node 24 with a PostgreSQL 17 service.
 
 ## Layout
 

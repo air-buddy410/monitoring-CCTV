@@ -25,8 +25,18 @@ export interface MockOnvifOptions {
   hangOperations?: string[];
   /** Host placed inside GetSnapshotUri responses (to exercise SSRF guard). */
   snapshotUriHost?: string;
+  /** URI scheme placed inside GetSnapshotUri responses (default http). */
+  snapshotUriScheme?: string;
+  /** Port placed inside GetSnapshotUri responses (default: this mock's port). */
+  snapshotUriPort?: number;
   /** Override the bytes served at the snapshot endpoint. */
   snapshotBody?: Buffer;
+  /** Respond to the (authenticated) snapshot request with a 302 to this URL. */
+  snapshotRedirectTo?: string;
+  /** Base URL advertised in GetCapabilities XAddrs instead of this mock (to exercise host pinning). */
+  xaddrBase?: string;
+  /** A badly behaved device that echoes the submitted password inside its SOAP fault text. */
+  faultEchoesPassword?: boolean;
 }
 export interface RecordedRequest {
   operation: string;
@@ -71,7 +81,7 @@ export async function startMockOnvif(opts: MockOnvifOptions): Promise<MockOnvif>
   const sockets = new Set<Socket>();
   const digestNonces = new Set<string>();
   let port = 0;
-  const base = () => `http://${host}:${port}`;
+  const base = () => opts.xaddrBase ?? `http://${host}:${port}`;
 
   const wsseOk = (xml: string): boolean => {
     const u = /<(?:\w+:)?Username\b[^>]*>([^<]*)</.exec(xml)?.[1];
@@ -139,9 +149,9 @@ export async function startMockOnvif(opts: MockOnvifOptions): Promise<MockOnvif>
       case "GetSnapshotUri": {
         const tok = /<(?:\w+:)?ProfileToken[^>]*>([^<]*)</.exec(reqXml)?.[1] ?? "P0_main";
         const h = opts.snapshotUriHost ?? host;
-        const p = opts.snapshotUriHost ? 80 : port;
+        const p = opts.snapshotUriPort ?? (opts.snapshotUriHost ? 80 : port);
         return envelope(
-          `<trt:GetSnapshotUriResponse><trt:MediaUri><tt:Uri>http://${h}:${p}/snapshot/${esc(tok)}.jpg</tt:Uri><tt:InvalidAfterConnect>false</tt:InvalidAfterConnect><tt:InvalidAfterReboot>false</tt:InvalidAfterReboot><tt:Timeout>PT0S</tt:Timeout></trt:MediaUri></trt:GetSnapshotUriResponse>`,
+          `<trt:GetSnapshotUriResponse><trt:MediaUri><tt:Uri>${opts.snapshotUriScheme ?? "http"}://${h}:${p}/snapshot/${esc(tok)}.jpg</tt:Uri><tt:InvalidAfterConnect>false</tt:InvalidAfterConnect><tt:InvalidAfterReboot>false</tt:InvalidAfterReboot><tt:Timeout>PT0S</tt:Timeout></trt:MediaUri></trt:GetSnapshotUriResponse>`,
         );
       }
       default:
@@ -167,7 +177,10 @@ export async function startMockOnvif(opts: MockOnvifOptions): Promise<MockOnvif>
       res.end(body);
     };
     if (op !== "GetSystemDateAndTime" && !authenticated) {
-      return send(400, fault("ter:NotAuthorized", "Sender not authorized"));
+      const echoed = opts.faultEchoesPassword
+        ? ` (credentials ${esc(opts.username)}:${esc(/<(?:\w+:)?Password[^>]*>([^<]*)</.exec(xml)?.[1] ?? "")})`
+        : "";
+      return send(400, fault("ter:NotAuthorized", `Sender not authorized${echoed}`));
     }
     send(200, respond(op, xml));
   };
@@ -191,6 +204,10 @@ export async function startMockOnvif(opts: MockOnvifOptions): Promise<MockOnvif>
     const expected = md5(`${ha1}:${p.nonce}:${p.nc}:${p.cnonce}:auth:${ha2}`);
     if (p.username !== opts.username || p.response !== expected || !digestNonces.has(p.nonce ?? "")) {
       return challenge();
+    }
+    if (opts.snapshotRedirectTo) {
+      res.writeHead(302, { location: opts.snapshotRedirectTo });
+      return res.end();
     }
     snapshotHits++;
     const body = opts.snapshotBody ?? JPEG;
@@ -220,6 +237,40 @@ export async function startMockOnvif(opts: MockOnvifOptions): Promise<MockOnvif>
     port,
     requests: () => [...recorded],
     snapshotRequestCount: () => snapshotHits,
+    stop: () =>
+      new Promise<void>((resolve) => {
+        for (const s of sockets) s.destroy();
+        server.close(() => resolve());
+      }),
+  };
+}
+
+export interface Decoy {
+  host: string;
+  port: number;
+  /** Every request line this decoy received. A secure system never reaches it. */
+  hits(): string[];
+  stop(): Promise<void>;
+}
+
+/** Stand-in for "somewhere we must never connect" (cloud metadata service, localhost admin port, ...). */
+export async function startDecoy(host = "127.0.0.1"): Promise<Decoy> {
+  const seen: string[] = [];
+  const sockets = new Set<Socket>();
+  const server = http.createServer((req, res) => {
+    seen.push(`${req.method} ${req.url}`);
+    res.writeHead(200, { "content-type": "image/jpeg" });
+    res.end(JPEG);
+  });
+  server.on("connection", (s) => {
+    sockets.add(s);
+    s.on("close", () => sockets.delete(s));
+  });
+  await new Promise<void>((resolve) => server.listen(0, host, resolve));
+  return {
+    host,
+    port: (server.address() as { port: number }).port,
+    hits: () => [...seen],
     stop: () =>
       new Promise<void>((resolve) => {
         for (const s of sockets) s.destroy();

@@ -13,7 +13,7 @@ Tidak ada agen/WebSocket, jadi API menghubungi perangkat sendiri lewat `packages
 ## D3. Perlindungan SSRF karena API menghubungi alamat dari pengguna
 - Host harus **literal IP** (tanpa DNS, jadi tak ada DNS rebinding).
 - Selalu ditolak: link-local (termasuk 169.254.169.254), unspecified, multicast/broadcast. Loopback ditolak kecuali `ALLOW_LOOPBACK_TARGETS=true` (dev/test untuk mock).
-- Alamat privat RFC1918 **diizinkan** (kamera memang di LAN). Ini berarti API yang berada di jaringan internal dapat dipakai memindai jaringan itu oleh user terautentikasi. Mitigasi lanjutan (allowlist per tenant, rate limit probe) belum dibuat; di arsitektur final risiko ini hilang karena probe berjalan di agen.
+- **Diperbarui (putaran lanjutan, D12):** kebijakan sekarang berupa allow-list eksplisit; lihat D12. Risiko yang tersisa: API di jaringan internal tetap dapat dipakai memindai rentang privat yang diizinkan oleh user terautentikasi (dibatasi rate limit, belum ada allow-list per tenant); di arsitektur final risiko ini hilang karena probe berjalan di agen.
 - Alamat snapshot yang dikembalikan perangkat harus punya host sama dengan perangkat yang dituju (`snapshot_uri_host_mismatch`); redirect HTTP tidak diikuti; hanya Digest (Basic ditolak); maks 5 MB; wajib JPEG (SOI/EOI).
 
 ## D4. Whitelist ONVIF ditegakkan di satu titik keluar transport
@@ -45,5 +45,22 @@ PRD: Node 24 LTS dan PostgreSQL 17. Environment: Node 22.22.0 dan PostgreSQL 16.
 - Kemampuan hanya `ya` bila dibuktikan oleh panggilan nyata saat probe (`live`: GetStreamUri sukses; `snapshot`: GetSnapshotUri sukses, **URI-nya belum diambil saat probe**; `ptz`: ada konfigurasi PTZ pada profil atau layanan PTZ). `ptz.preset`, `health`, serta event/playback yang diiklankan perangkat dicatat `belum-diuji`; yang tidak diiklankan `tidak`. URI RTSP tidak disimpan (bisa memuat kredensial).
 - `brand` dinormalisasi dari `Manufacturer` (hikvision/dahua/axis, selain itu huruf kecil tanpa simbol). `adapter_id` selalu `onvif-generic` di MVP-0.
 
-## D11. Perilaku yang tidak tercakup tes otomatis
-Tes dijalankan dengan `NODE_ENV=test`, dan Better Auth melewati pemeriksaan `Origin` (CSRF) pada mode itu. Pemeriksaan itu terbukti aktif saat dijalankan manual dengan `curl` tanpa header `Origin` (403 `MISSING_OR_NULL_ORIGIN`), tetapi tidak ada tes otomatisnya.
+## D11. (DIGANTI oleh D13) Pemeriksaan Origin tidak tercakup tes
+Putaran pertama mencatat bahwa Better Auth melewati pemeriksaan Origin saat `NODE_ENV=test`. Sudah diperbaiki dan diuji di D13.
+
+## D12. Kebijakan target perangkat eksplisit (putaran lanjutan)
+Urutan keputusan di `apps/api/src/target-policy.ts`: (1) selalu ditolak: 0.0.0.0/8, link-local 169.254/16 dan fe80::/10, multicast, broadcast, metadata cloud (AWS IPv6 `fd00:ec2::254`, Alibaba `100.100.100.200`, Azure `168.63.129.16`), `::`; (2) loopback hanya dengan `ALLOW_LOOPBACK_TARGETS=true` (pengecualian lab/dev); (3) allow-list: bawaan = RFC1918 + `fc00::/7` (IP privat tetap didukung untuk kamera lab); alamat publik **ditolak** secara bawaan. `TARGET_ALLOW_CIDRS` mengganti (bukan menambah) daftar bawaan, tetapi tidak pernah mengalahkan daftar (1). IPv4-mapped IPv6 di-unwrap sebelum dicek; ejaan IP non-kanonik (`0177.0.0.1`, `2130706433`, `127.1`) bukan literal IP dan ditolak.
+Alamat snapshot dari perangkat: host harus sama dengan perangkat, skema http/https, port hanya 80/443/port ONVIF yang dipilih operator (`snapshot_uri_port_not_allowed`), redirect tidak diikuti. Alamat layanan (XAddr) dari perangkat dikunci kembali ke host perangkat.
+Batasan: pemeriksaan hanya pada literal IP yang dimasukkan; tidak ada DNS. Allow-list global, belum per tenant.
+
+## D13. CSRF/Origin
+- Better Auth menonaktifkan pemeriksaan Origin otomatis bila `NODE_ENV=test`. Sekarang `advanced.disableOriginCheck: false` diset eksplisit sehingga perilaku sama di semua environment, dan diuji (`csrf.int.test.ts`).
+- Rute `/v1` memakai cookie sesi tetapi tidak dilindungi Better Auth. Hook `onRequest` di `apps/api/src/app.ts` menolak request tulis (non GET/HEAD/OPTIONS) bila `Origin` ada tetapi tidak tepercaya (termasuk `null`) atau `Sec-Fetch-Site: cross-site`. Request tanpa kedua header diizinkan (klien non-browser; browser selalu mengirim Origin pada tulis lintas-origin). Origin tepercaya = origin `BASE_URL` + `TRUSTED_ORIGINS`.
+- Konsekuensi: panggilan `/api/auth/*` ber-cookie wajib mengirim `Origin` (tes dan README disesuaikan).
+
+## D14. Rate limit
+Limiter jendela tetap, in-memory, dibatasi memori (`apps/api/src/rate-limit.ts`). Kunci: login/sign-up/ubah/reset sandi = per IP klien **dan** per email; probe (`POST /v1/devices`) dan snapshot = per organisasi+pengguna. Percobaan gagal ikut dihitung; percobaan yang ditolak dicatat di audit (`rate_limited`) dan tidak menyentuh perangkat. Batas bawaan 10/mnt (auth), 10/mnt (probe), 30/mnt (snapshot), bisa diatur lewat env.
+Batasan: hanya satu proses (multi-instance butuh penyimpanan bersama); IP klien benar hanya bila `TRUST_PROXY` diatur sesuai proxy; baris audit untuk percobaan yang dibatasi dapat menggelembungkan audit oleh pengguna yang sah-terautentikasi (belum dibatasi).
+
+## D15. Tes tidak bergantung pada `pg_dump`
+`pg_dump` klien 16 menolak server 17. Tes "kata sandi tidak ada di seluruh DB" kini memindai semua baris semua tabel `public` lewat SQL (`t::text`), asersinya sama. Cakupan tetap hanya data tabel (bukan berkas WAL/data directory).
