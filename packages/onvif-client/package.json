@@ -1,0 +1,19 @@
+{
+  "name": "@pantau/onvif-client",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "onvif": "1.0.0-rc.3"
+  },
+  "devDependencies": {}
+}

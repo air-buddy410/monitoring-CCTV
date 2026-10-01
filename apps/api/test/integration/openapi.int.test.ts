@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { type TestEnv, createTestEnv } from "../helpers";
+import { createTestEnv, type TestEnv } from "../helpers";
 
 describe("OpenAPI", () => {
   let env: TestEnv;
@@ -29,7 +29,10 @@ describe("OpenAPI", () => {
     for (const [path, method] of expected) {
       expect(doc.paths[path]?.[method], `${method.toUpperCase()} ${path}`).toBeDefined();
     }
-    const post = doc.paths["/v1/devices"]?.post as { requestBody?: unknown; responses?: Record<string, unknown> };
+    const post = doc.paths["/v1/devices"]?.post as {
+      requestBody?: unknown;
+      responses?: Record<string, unknown>;
+    };
     expect(post.requestBody).toBeDefined();
     expect(post.responses?.["201"]).toBeDefined();
     expect(post.responses?.["404"]).toBeDefined();

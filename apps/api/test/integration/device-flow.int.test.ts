@@ -1,12 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-  DEVICE_PASSWORD,
-  type TestEnv,
-  type Tenant,
   addDevice,
   createSite,
   createTenant,
   createTestEnv,
+  DEVICE_PASSWORD,
+  type Tenant,
+  type TestEnv,
 } from "../helpers";
 
 describe("MVP-0 flow: add device -> probe -> cameras -> snapshot (against mock ONVIF)", () => {
@@ -96,7 +96,9 @@ describe("MVP-0 flow: add device -> probe -> cameras -> snapshot (against mock O
   it("rejects wrong device credentials with a clean error and creates nothing", async () => {
     const mock = await env.startMock();
     const before = (
-      (await env.built.app.inject({ method: "GET", url: "/v1/devices", headers: { cookie: a.cookie } })).json() as {
+      (
+        await env.built.app.inject({ method: "GET", url: "/v1/devices", headers: { cookie: a.cookie } })
+      ).json() as {
         items: unknown[];
       }
     ).items.length;
@@ -104,7 +106,9 @@ describe("MVP-0 flow: add device -> probe -> cameras -> snapshot (against mock O
     expect(res.statusCode).toBe(422);
     expect((res.json() as { code: string }).code).toBe("device_auth_failed");
     const after = (
-      (await env.built.app.inject({ method: "GET", url: "/v1/devices", headers: { cookie: a.cookie } })).json() as {
+      (
+        await env.built.app.inject({ method: "GET", url: "/v1/devices", headers: { cookie: a.cookie } })
+      ).json() as {
         items: unknown[];
       }
     ).items.length;

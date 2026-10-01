@@ -1,6 +1,6 @@
 import { createOnvifClient } from "@pantau/onvif-client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { type TestEnv, createTestEnv, DEVICE_PASSWORD, DEVICE_USERNAME } from "../helpers";
+import { createTestEnv, DEVICE_PASSWORD, DEVICE_USERNAME, type TestEnv } from "../helpers";
 
 describe("ONVIF whitelist enforced at transport level against the mock", () => {
   let env: TestEnv;
@@ -34,14 +34,23 @@ describe("ONVIF whitelist enforced at transport level against the mock", () => {
     [
       "SetSystemDateAndTime",
       (c: Awaited<ReturnType<typeof client>>["c"]) =>
-        c.raw.device.setSystemDateAndTime({ dateTimeType: "Manual", daylightSavings: false } as never),
+        c.raw.device.setSystemDateAndTime({
+          dateTimeType: "Manual",
+          daylightSavings: false,
+          dateTime: new Date("2026-01-01T00:00:00Z"),
+        } as never),
     ],
     [
       "CreateUsers",
       (c: Awaited<ReturnType<typeof client>>["c"]) =>
-        c.raw.device.createUsers({ user: [{ username: "x", password: "y", userLevel: "Administrator" }] } as never),
+        c.raw.device.createUsers({
+          user: [{ username: "x", password: "y", userLevel: "Administrator" }],
+        } as never),
     ],
-    ["DeleteUsers", (c: Awaited<ReturnType<typeof client>>["c"]) => c.raw.device.deleteUsers({ username: ["x"] } as never)],
+    [
+      "DeleteUsers",
+      (c: Awaited<ReturnType<typeof client>>["c"]) => c.raw.device.deleteUsers({ username: ["x"] } as never),
+    ],
     [
       "StartFirmwareUpgrade",
       (c: Awaited<ReturnType<typeof client>>["c"]) => c.raw.device.startFirmwareUpgrade(),
@@ -59,7 +68,10 @@ describe("ONVIF whitelist enforced at transport level against the mock", () => {
   it("rejects an arbitrary hand-built SOAP envelope for a non-whitelisted operation", async () => {
     const { c, mock } = await client();
     await expect(
-      c.raw.request({ service: "device", body: { SystemReboot: { $: { xmlns: "http://www.onvif.org/ver10/device/wsdl" } } } }),
+      c.raw.request({
+        service: "device",
+        body: { SystemReboot: { $: { xmlns: "http://www.onvif.org/ver10/device/wsdl" } } },
+      }),
     ).rejects.toMatchObject({ code: "onvif_method_not_allowed" });
     expect(mock.requests().map((r) => r.operation)).not.toContain("SystemReboot");
   });

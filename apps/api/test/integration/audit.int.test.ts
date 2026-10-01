@@ -1,12 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import {
-  type TestEnv,
-  type Tenant,
-  addDevice,
-  createSite,
-  createTenant,
-  createTestEnv,
-} from "../helpers";
+import { addDevice, createSite, createTenant, createTestEnv, type Tenant, type TestEnv } from "../helpers";
 
 interface AuditItem {
   action: string;
@@ -40,7 +33,11 @@ describe("audit trail", () => {
     });
     expect(snap.statusCode).toBe(200);
 
-    const res = await env.built.app.inject({ method: "GET", url: "/v1/audit", headers: { cookie: a.cookie } });
+    const res = await env.built.app.inject({
+      method: "GET",
+      url: "/v1/audit",
+      headers: { cookie: a.cookie },
+    });
     expect(res.statusCode).toBe(200);
     const items = (res.json() as { items: AuditItem[] }).items;
     const created = items.find((i) => i.action === "device.create");
@@ -51,7 +48,9 @@ describe("audit trail", () => {
     expect(typeof snapped?.meta.bytes).toBe("number");
 
     const bItems = (
-      (await env.built.app.inject({ method: "GET", url: "/v1/audit", headers: { cookie: b.cookie } })).json() as {
+      (
+        await env.built.app.inject({ method: "GET", url: "/v1/audit", headers: { cookie: b.cookie } })
+      ).json() as {
         items: AuditItem[];
       }
     ).items;
@@ -64,7 +63,9 @@ describe("audit trail", () => {
     const mock = await env.startMock();
     await addDevice(env, a, siteId, mock, { password: "Wrong-Dummy-Pw-0000!" });
     const items = (
-      (await env.built.app.inject({ method: "GET", url: "/v1/audit", headers: { cookie: a.cookie } })).json() as {
+      (
+        await env.built.app.inject({ method: "GET", url: "/v1/audit", headers: { cookie: a.cookie } })
+      ).json() as {
         items: AuditItem[];
       }
     ).items;

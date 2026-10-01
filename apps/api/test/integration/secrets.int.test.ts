@@ -1,14 +1,14 @@
 import { execFileSync } from "node:child_process";
-import { afterAll, beforeAll, describe, expect, it, inject } from "vitest";
+import { afterAll, beforeAll, describe, expect, inject, it } from "vitest";
 import {
-  DEVICE_PASSWORD,
-  type TestEnv,
-  type Tenant,
-  USER_PASSWORD,
   addDevice,
   createSite,
   createTenant,
   createTestEnv,
+  DEVICE_PASSWORD,
+  type Tenant,
+  type TestEnv,
+  USER_PASSWORD,
 } from "../helpers";
 
 describe("device password never leaks", () => {
@@ -41,7 +41,14 @@ describe("device password never leaks", () => {
       ).body,
     );
 
-    for (const url of ["/v1/devices", `/v1/devices/${device.id}`, "/v1/cameras", `/v1/cameras/${cameras[0]?.id}`, "/v1/audit", "/docs/json"]) {
+    for (const url of [
+      "/v1/devices",
+      `/v1/devices/${device.id}`,
+      "/v1/cameras",
+      `/v1/cameras/${cameras[0]?.id}`,
+      "/v1/audit",
+      "/docs/json",
+    ]) {
       responses.push(
         (await env.built.app.inject({ method: "GET", url, headers: { cookie: a.cookie } })).body,
       );
@@ -59,7 +66,20 @@ describe("device password never leaks", () => {
     expect(responses.length).toBeGreaterThan(8);
     for (const r of responses) {
       expect(r).not.toContain(DEVICE_PASSWORD);
-      expect(r.toLowerCase()).not.toContain('"password"');
+      // the OpenAPI document legitimately names the *input* field; every other response must not
+      if (!r.startsWith('{"openapi"')) expect(r.toLowerCase()).not.toContain('"password"');
+    }
+  });
+
+  it("no OpenAPI response schema exposes a credential field", async () => {
+    const doc = (await env.built.app.inject({ method: "GET", url: "/docs/json" })).json() as {
+      paths: Record<string, Record<string, { responses?: unknown }>>;
+    };
+    for (const [path, methods] of Object.entries(doc.paths)) {
+      for (const [method, op] of Object.entries(methods)) {
+        const text = JSON.stringify(op.responses ?? {}).toLowerCase();
+        expect(text, `${method} ${path}`).not.toMatch(/"(password|username|credentials?)"/);
+      }
     }
   });
 

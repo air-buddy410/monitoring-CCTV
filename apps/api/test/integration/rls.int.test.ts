@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import pg from "pg";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { inject } from "vitest";
+import { afterAll, beforeAll, describe, expect, inject, it } from "vitest";
 
 /**
  * Proves isolation at the database layer, independent of API code:
@@ -20,10 +19,11 @@ describe("PostgreSQL RLS", () => {
     app = new pg.Pool({ connectionString: urls.app, max: 2 });
     admin = new pg.Pool({ connectionString: urls.admin, max: 2 });
     for (const id of [orgA, orgB]) {
-      await admin.query(
-        `insert into "organization" (id, name, slug, created_at) values ($1,$2,$3, now())`,
-        [id, id, id],
-      );
+      await admin.query(`insert into "organization" (id, name, slug, created_at) values ($1,$2,$3, now())`, [
+        id,
+        id,
+        id,
+      ]);
     }
     await admin.query(`insert into site (id, organization_id, name) values ($1,$2,'s')`, [siteA, orgA]);
     await admin.query(
@@ -58,9 +58,7 @@ describe("PostgreSQL RLS", () => {
   }
 
   it("application role is not superuser and does not bypass RLS", async () => {
-    const r = await app.query(
-      "select rolsuper, rolbypassrls from pg_roles where rolname = current_user",
-    );
+    const r = await app.query("select rolsuper, rolbypassrls from pg_roles where rolname = current_user");
     expect(r.rows[0]).toEqual({ rolsuper: false, rolbypassrls: false });
   });
 

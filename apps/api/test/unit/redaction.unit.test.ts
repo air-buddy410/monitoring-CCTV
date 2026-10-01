@@ -4,7 +4,12 @@ import { REDACT_PATHS } from "../../src/logger";
 
 describe("logging redaction + config", () => {
   it("redacts auth headers, cookies and credential fields", () => {
-    for (const p of ["req.headers.authorization", "req.headers.cookie", "res.headers[\"set-cookie\"]", "*.password"]) {
+    for (const p of [
+      "req.headers.authorization",
+      "req.headers.cookie",
+      'res.headers["set-cookie"]',
+      "*.password",
+    ]) {
       expect(REDACT_PATHS).toContain(p);
     }
   });

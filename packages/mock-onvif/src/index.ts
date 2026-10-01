@@ -1,0 +1,229 @@
+import { createHash, randomBytes } from "node:crypto";
+import http, { type IncomingMessage, type ServerResponse } from "node:http";
+import type { Socket } from "node:net";
+
+/** Smallest valid baseline JPEG (1x1 px). Dummy image. */
+export const DUMMY_JPEG = Buffer.from(
+  "/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=",
+  "base64",
+);
+// ensure it ends with EOI for strict checks
+const JPEG = Buffer.concat([DUMMY_JPEG.subarray(0, 2), DUMMY_JPEG.subarray(2), Buffer.from([0xff, 0xd9])]);
+
+export interface MockOnvifOptions {
+  username: string;
+  password: string;
+  host?: string;
+  manufacturer?: string;
+  model?: string;
+  firmware?: string;
+  serial?: string;
+  channels?: number;
+  /** Channel indexes that expose PTZ. */
+  ptzChannels?: number[];
+  /** Operations that never get a response (to exercise deadlines). */
+  hangOperations?: string[];
+  /** Host placed inside GetSnapshotUri responses (to exercise SSRF guard). */
+  snapshotUriHost?: string;
+  /** Override the bytes served at the snapshot endpoint. */
+  snapshotBody?: Buffer;
+}
+export interface RecordedRequest {
+  operation: string;
+  authenticated: boolean;
+}
+export interface MockOnvif {
+  host: string;
+  port: number;
+  requests(): RecordedRequest[];
+  snapshotRequestCount(): number;
+  stop(): Promise<void>;
+}
+
+const NS = {
+  s: "http://www.w3.org/2003/05/soap-envelope",
+  tds: "http://www.onvif.org/ver10/device/wsdl",
+  trt: "http://www.onvif.org/ver10/media/wsdl",
+  tt: "http://www.onvif.org/ver10/schema",
+  tptz: "http://www.onvif.org/ver20/ptz/wsdl",
+};
+const envelope = (body: string) =>
+  `<?xml version="1.0" encoding="UTF-8"?><s:Envelope xmlns:s="${NS.s}" xmlns:tds="${NS.tds}" xmlns:trt="${NS.trt}" xmlns:tt="${NS.tt}" xmlns:tptz="${NS.tptz}"><s:Body>${body}</s:Body></s:Envelope>`;
+const esc = (v: string) => v.replace(/[<>&"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+function fault(subcode: string, reason: string) {
+  return envelope(
+    `<s:Fault><s:Code><s:Value>s:Sender</s:Value><s:Subcode><s:Value>${subcode}</s:Value></s:Subcode></s:Code><s:Reason><s:Text xml:lang="en">${reason}</s:Text></s:Reason></s:Fault>`,
+  );
+}
+
+function md5(s: string) {
+  return createHash("md5").update(s).digest("hex");
+}
+
+export async function startMockOnvif(opts: MockOnvifOptions): Promise<MockOnvif> {
+  const host = opts.host ?? "127.0.0.1";
+  const channels = opts.channels ?? 1;
+  const ptz = new Set(opts.ptzChannels ?? []);
+  const hang = new Set(opts.hangOperations ?? []);
+  const recorded: RecordedRequest[] = [];
+  let snapshotHits = 0;
+  const sockets = new Set<Socket>();
+  const digestNonces = new Set<string>();
+  let port = 0;
+  const base = () => `http://${host}:${port}`;
+
+  const wsseOk = (xml: string): boolean => {
+    const u = /<(?:\w+:)?Username\b[^>]*>([^<]*)</.exec(xml)?.[1];
+    const digest = /<(?:\w+:)?Password[^>]*>([^<]*)</.exec(xml)?.[1];
+    const nonce = /<(?:\w+:)?Nonce[^>]*>([^<]*)</.exec(xml)?.[1];
+    const created = /<(?:\w+:)?Created[^>]*>([^<]*)</.exec(xml)?.[1];
+    if (u !== opts.username || !digest || !nonce || !created) return false;
+    const expected = createHash("sha1")
+      .update(Buffer.concat([Buffer.from(nonce, "base64"), Buffer.from(created), Buffer.from(opts.password)]))
+      .digest("base64");
+    return expected === digest;
+  };
+
+  const profileXml = (ch: number, kind: "main" | "sub") => {
+    const main = kind === "main";
+    const withPtz = main && ptz.has(ch);
+    return (
+      `<trt:Profiles token="P${ch}_${kind}" fixed="true"><tt:Name>${kind}-${ch}</tt:Name>` +
+      `<tt:VideoSourceConfiguration token="VSC${ch}"><tt:Name>VSC${ch}</tt:Name><tt:UseCount>2</tt:UseCount><tt:SourceToken>VS_${ch}</tt:SourceToken><tt:Bounds x="0" y="0" width="1920" height="1080"/></tt:VideoSourceConfiguration>` +
+      `<tt:VideoEncoderConfiguration token="VEC${ch}_${kind}"><tt:Name>VEC${ch}_${kind}</tt:Name><tt:UseCount>1</tt:UseCount><tt:Encoding>H264</tt:Encoding><tt:Resolution><tt:Width>${main ? 1920 : 640}</tt:Width><tt:Height>${main ? 1080 : 360}</tt:Height></tt:Resolution><tt:Quality>5</tt:Quality><tt:RateControl><tt:FrameRateLimit>25</tt:FrameRateLimit><tt:EncodingInterval>1</tt:EncodingInterval><tt:BitrateLimit>${main ? 4096 : 512}</tt:BitrateLimit></tt:RateControl><tt:Multicast><tt:Address><tt:Type>IPv4</tt:Type><tt:IPv4Address>0.0.0.0</tt:IPv4Address></tt:Address><tt:Port>0</tt:Port><tt:TTL>1</tt:TTL><tt:AutoStart>false</tt:AutoStart></tt:Multicast><tt:SessionTimeout>PT60S</tt:SessionTimeout></tt:VideoEncoderConfiguration>` +
+      (withPtz
+        ? `<tt:PTZConfiguration token="PTZC${ch}"><tt:Name>PTZ${ch}</tt:Name><tt:UseCount>1</tt:UseCount><tt:NodeToken>PTZNODE${ch}</tt:NodeToken></tt:PTZConfiguration>`
+        : "") +
+      `</trt:Profiles>`
+    );
+  };
+
+  const respond = (op: string, reqXml: string): string => {
+    switch (op) {
+      case "GetSystemDateAndTime": {
+        const d = new Date();
+        return envelope(
+          `<tds:GetSystemDateAndTimeResponse><tds:SystemDateAndTime><tt:DateTimeType>NTP</tt:DateTimeType><tt:DaylightSavings>false</tt:DaylightSavings><tt:TimeZone><tt:TZ>UTC0</tt:TZ></tt:TimeZone><tt:UTCDateTime><tt:Time><tt:Hour>${d.getUTCHours()}</tt:Hour><tt:Minute>${d.getUTCMinutes()}</tt:Minute><tt:Second>${d.getUTCSeconds()}</tt:Second></tt:Time><tt:Date><tt:Year>${d.getUTCFullYear()}</tt:Year><tt:Month>${d.getUTCMonth() + 1}</tt:Month><tt:Day>${d.getUTCDate()}</tt:Day></tt:Date></tt:UTCDateTime></tds:SystemDateAndTime></tds:GetSystemDateAndTimeResponse>`,
+        );
+      }
+      case "GetServices":
+        return fault("ter:ActionNotSupported", "Optional action not implemented");
+      case "GetCapabilities":
+        return envelope(
+          `<tds:GetCapabilitiesResponse><tds:Capabilities><tt:Device><tt:XAddr>${base()}/onvif/device_service</tt:XAddr></tt:Device><tt:Media><tt:XAddr>${base()}/onvif/media_service</tt:XAddr><tt:StreamingCapabilities><tt:RTPMulticast>false</tt:RTPMulticast><tt:RTP_TCP>true</tt:RTP_TCP><tt:RTP_RTSP_TCP>true</tt:RTP_RTSP_TCP></tt:StreamingCapabilities></tt:Media>${
+            ptz.size > 0 ? `<tt:PTZ><tt:XAddr>${base()}/onvif/ptz_service</tt:XAddr></tt:PTZ>` : ""
+          }</tds:Capabilities></tds:GetCapabilitiesResponse>`,
+        );
+      case "GetDeviceInformation":
+        return envelope(
+          `<tds:GetDeviceInformationResponse><tds:Manufacturer>${esc(opts.manufacturer ?? "MockVendor")}</tds:Manufacturer><tds:Model>${esc(opts.model ?? "MV-MOCK-1")}</tds:Model><tds:FirmwareVersion>${esc(opts.firmware ?? "1.0.0-mock")}</tds:FirmwareVersion><tds:SerialNumber>${esc(opts.serial ?? "MOCK-0001")}</tds:SerialNumber><tds:HardwareId>mock-hw</tds:HardwareId></tds:GetDeviceInformationResponse>`,
+        );
+      case "GetProfiles": {
+        let profiles = "";
+        for (let i = 0; i < channels; i++) profiles += profileXml(i, "main") + profileXml(i, "sub");
+        return envelope(`<trt:GetProfilesResponse>${profiles}</trt:GetProfilesResponse>`);
+      }
+      case "GetVideoSources": {
+        let vs = "";
+        for (let i = 0; i < channels; i++)
+          vs += `<trt:VideoSources token="VS_${i}"><tt:Framerate>25</tt:Framerate><tt:Resolution><tt:Width>1920</tt:Width><tt:Height>1080</tt:Height></tt:Resolution></trt:VideoSources>`;
+        return envelope(`<trt:GetVideoSourcesResponse>${vs}</trt:GetVideoSourcesResponse>`);
+      }
+      case "GetStreamUri": {
+        const tok = /<(?:\w+:)?ProfileToken[^>]*>([^<]*)</.exec(reqXml)?.[1] ?? "P0_main";
+        return envelope(
+          `<trt:GetStreamUriResponse><trt:MediaUri><tt:Uri>rtsp://${host}:554/${esc(tok)}</tt:Uri><tt:InvalidAfterConnect>false</tt:InvalidAfterConnect><tt:InvalidAfterReboot>false</tt:InvalidAfterReboot><tt:Timeout>PT0S</tt:Timeout></trt:MediaUri></trt:GetStreamUriResponse>`,
+        );
+      }
+      case "GetSnapshotUri": {
+        const tok = /<(?:\w+:)?ProfileToken[^>]*>([^<]*)</.exec(reqXml)?.[1] ?? "P0_main";
+        const h = opts.snapshotUriHost ?? host;
+        const p = opts.snapshotUriHost ? 80 : port;
+        return envelope(
+          `<trt:GetSnapshotUriResponse><trt:MediaUri><tt:Uri>http://${h}:${p}/snapshot/${esc(tok)}.jpg</tt:Uri><tt:InvalidAfterConnect>false</tt:InvalidAfterConnect><tt:InvalidAfterReboot>false</tt:InvalidAfterReboot><tt:Timeout>PT0S</tt:Timeout></trt:MediaUri></trt:GetSnapshotUriResponse>`,
+        );
+      }
+      default:
+        return fault("ter:ActionNotSupported", `Operation ${esc(op)} not implemented by mock`);
+    }
+  };
+
+  const readBody = (req: IncomingMessage) =>
+    new Promise<string>((resolve) => {
+      const chunks: Buffer[] = [];
+      req.on("data", (c: Buffer) => chunks.push(c));
+      req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    });
+
+  const handleSoap = async (req: IncomingMessage, res: ServerResponse) => {
+    const xml = await readBody(req);
+    const op = /<(?:[\w-]+:)?Body\b[^>]*>\s*<(?:[\w-]+:)?(\w+)/.exec(xml)?.[1] ?? "<unknown>";
+    const authenticated = wsseOk(xml);
+    recorded.push({ operation: op, authenticated });
+    if (hang.has(op)) return; // never respond; socket stays open until client gives up
+    const send = (status: number, body: string) => {
+      res.writeHead(status, { "content-type": "application/soap+xml; charset=utf-8" });
+      res.end(body);
+    };
+    if (op !== "GetSystemDateAndTime" && !authenticated) {
+      return send(400, fault("ter:NotAuthorized", "Sender not authorized"));
+    }
+    send(200, respond(op, xml));
+  };
+
+  const handleSnapshot = (req: IncomingMessage, res: ServerResponse) => {
+    const auth = req.headers.authorization ?? "";
+    const challenge = () => {
+      const nonce = randomBytes(12).toString("hex");
+      digestNonces.add(nonce);
+      res.writeHead(401, {
+        "www-authenticate": `Digest realm="mock", nonce="${nonce}", qop="auth", algorithm=MD5`,
+      });
+      res.end();
+    };
+    if (!auth.startsWith("Digest ")) return challenge();
+    const p: Record<string, string> = {};
+    for (const m of auth.slice(7).matchAll(/(\w+)=(?:"([^"]*)"|([^,\s]*))/g))
+      p[m[1] ?? ""] = m[2] ?? m[3] ?? "";
+    const ha1 = md5(`${opts.username}:mock:${opts.password}`);
+    const ha2 = md5(`GET:${p.uri}`);
+    const expected = md5(`${ha1}:${p.nonce}:${p.nc}:${p.cnonce}:auth:${ha2}`);
+    if (p.username !== opts.username || p.response !== expected || !digestNonces.has(p.nonce ?? "")) {
+      return challenge();
+    }
+    snapshotHits++;
+    const body = opts.snapshotBody ?? JPEG;
+    res.writeHead(200, {
+      "content-type": opts.snapshotBody ? "text/html" : "image/jpeg",
+      "content-length": body.length,
+    });
+    res.end(body);
+  };
+
+  const server = http.createServer((req, res) => {
+    const url = req.url ?? "/";
+    if (req.method === "POST" && url.startsWith("/onvif/")) return void handleSoap(req, res);
+    if (req.method === "GET" && url.startsWith("/snapshot/")) return handleSnapshot(req, res);
+    res.writeHead(404);
+    res.end();
+  });
+  server.on("connection", (s) => {
+    sockets.add(s);
+    s.on("close", () => sockets.delete(s));
+  });
+  await new Promise<void>((resolve) => server.listen(0, host, resolve));
+  port = (server.address() as { port: number }).port;
+
+  return {
+    host,
+    port,
+    requests: () => [...recorded],
+    snapshotRequestCount: () => snapshotHits,
+    stop: () =>
+      new Promise<void>((resolve) => {
+        for (const s of sockets) s.destroy();
+        server.close(() => resolve());
+      }),
+  };
+}

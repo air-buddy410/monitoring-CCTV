@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  OnvifMethodNotAllowedError,
   assertOperationAllowed,
   extractSoapOperation,
   isOperationAllowed,
+  OnvifMethodNotAllowedError,
 } from "../src/index";
 
 describe("ONVIF operation whitelist", () => {
@@ -70,9 +70,13 @@ describe("ONVIF operation whitelist", () => {
   it("extracts the operation from a SOAP envelope (any prefix) and fails closed", () => {
     const env = (body: string) =>
       `<?xml version="1.0"?><s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"><s:Header><x/></s:Header><s:Body>${body}</s:Body></s:Envelope>`;
-    expect(extractSoapOperation(env('<GetProfiles xmlns="http://www.onvif.org/ver10/media/wsdl"/>'))).toBe("GetProfiles");
+    expect(extractSoapOperation(env('<GetProfiles xmlns="http://www.onvif.org/ver10/media/wsdl"/>'))).toBe(
+      "GetProfiles",
+    );
     expect(extractSoapOperation(env('<trt:GetProfiles xmlns:trt="x"/>'))).toBe("GetProfiles");
-    expect(extractSoapOperation(env('<tds:SystemReboot xmlns:tds="x"></tds:SystemReboot>'))).toBe("SystemReboot");
+    expect(extractSoapOperation(env('<tds:SystemReboot xmlns:tds="x"></tds:SystemReboot>'))).toBe(
+      "SystemReboot",
+    );
     expect(extractSoapOperation("<garbage/>")).toBeNull();
     expect(extractSoapOperation("")).toBeNull();
   });

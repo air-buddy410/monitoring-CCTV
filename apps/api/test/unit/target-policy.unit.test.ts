@@ -3,7 +3,15 @@ import { checkTarget } from "../../src/target-policy";
 
 describe("device target policy", () => {
   it("always blocks link-local, unspecified and multicast", () => {
-    for (const h of ["169.254.169.254", "169.254.0.1", "0.0.0.0", "224.0.0.1", "255.255.255.255", "fe80::1", "::"]) {
+    for (const h of [
+      "169.254.169.254",
+      "169.254.0.1",
+      "0.0.0.0",
+      "224.0.0.1",
+      "255.255.255.255",
+      "fe80::1",
+      "::",
+    ]) {
       expect(checkTarget(h, { allowLoopback: true }).allowed, h).toBe(false);
     }
   });
