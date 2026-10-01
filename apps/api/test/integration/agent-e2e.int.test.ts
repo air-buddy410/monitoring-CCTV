@@ -378,7 +378,14 @@ describe("agent end to end against the real API and a simulated ONVIF device (la
 
   it("NEGATIVE: a wrong token is refused, the agent reports it and stops retrying; nothing is created", async () => {
     const { agent, dataDir } = await launch({ name: "Agen Salah" });
-    const before = (await env.admin.query(`select count(*)::int as n from agent`)).rows[0].n;
+    const before = (
+      await env.admin.query(`select count(*)::int as n from agent where organization_id = $1`, [owner.orgId])
+    ).rows[0].n;
+    const namesBefore = (
+      await env.admin.query(`select name from agent where organization_id = $1 order by created_at`, [
+        owner.orgId,
+      ])
+    ).rows.map((r) => r.name);
     const id = JSON.parse(readFileSync(join(dataDir, "identity.json"), "utf8")) as { agentToken: string };
     const bad = Agent.load({
       apiUrl: httpUrl,
@@ -398,7 +405,12 @@ describe("agent end to end against the real API and a simulated ONVIF device (la
     // exactly one handshake with the bad token, then silence
     await new Promise((r) => setTimeout(r, 300));
     expect(proxy.upgradeAuth.filter((a) => a.includes("Z".repeat(43)))).toHaveLength(1);
-    expect((await env.admin.query(`select count(*)::int as n from agent`)).rows[0].n).toBe(before);
+    const namesAfter = (
+      await env.admin.query(`select name from agent where organization_id = $1 order by created_at`, [
+        owner.orgId,
+      ])
+    ).rows.map((r) => r.name);
+    expect(namesAfter.slice(namesBefore.length), "agents created while the bad token was tried").toEqual([]);
     expect(env.built.hub.isOnline(agent.identity.agentId)).toBe(false);
     expect(id.agentToken.startsWith("pat_")).toBe(true);
   });

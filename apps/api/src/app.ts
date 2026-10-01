@@ -78,10 +78,10 @@ export async function buildApp(opts: {
     openapi: {
       openapi: "3.0.3",
       info: {
-        title: "PANTAU API (MVP-0)",
-        version: "0.0.1",
+        title: "PANTAU API",
+        version: "0.2.0",
         description:
-          "Vertical slice: add device -> ONVIF probe -> cameras -> JPEG snapshot. Authentication and organizations (tenants) are provided by Better Auth under `/api/auth/*` (e.g. `POST /api/auth/sign-up/email`, `POST /api/auth/sign-in/email`, `POST /api/auth/organization/create`, `POST /api/auth/organization/set-active`); a session cookie is required on every `/v1` endpoint. Errors use `application/problem+json`.",
+          "Tenant API for devices, cameras, sites, grants, agents and the audit log. Authentication, two-factor and organizations (tenants) are provided by Better Auth under `/api/auth/*`; a session cookie is required on every `/v1` endpoint except `POST /v1/agent/enroll`, whose single-use enrollment token is the credential. The on-site agent connects to the WebSocket `/agent` (not described here; see packages/contracts/src/agent.ts and docs/DECISIONS.md D25). Errors use `application/problem+json`.",
       },
       tags: [
         { name: "health" },

@@ -165,11 +165,19 @@ describe("agent enrollment, agents list and revocation (PRD 4.5, 9.1)", () => {
     it("a token works once: the second use is refused and creates no agent", async () => {
       const e = await mint();
       expect((await enroll(e.token)).statusCode).toBe(201);
-      const before = Number((await env.admin.query(`select count(*) from agent`)).rows[0].count);
+      const before = Number(
+        (await env.admin.query(`select count(*) from agent where organization_id = $1`, [owner.orgId]))
+          .rows[0].count,
+      );
       const again = await enroll(e.token);
       expect(again.statusCode).toBe(401);
       expect((again.json() as { code: string }).code).toBe("enrollment_invalid");
-      expect(Number((await env.admin.query(`select count(*) from agent`)).rows[0].count)).toBe(before);
+      expect(
+        Number(
+          (await env.admin.query(`select count(*) from agent where organization_id = $1`, [owner.orgId]))
+            .rows[0].count,
+        ),
+      ).toBe(before);
       const used = await env.admin.query(
         `select used_at, used_by_agent_id from agent_enrollment where id = $1`,
         [e.id],
