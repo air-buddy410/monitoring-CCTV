@@ -21,7 +21,23 @@ and `docs/HASIL-CLOUD.md` for verification results and known gaps.
 - pnpm 10 (`corepack enable`)
 - PostgreSQL >= 16 reachable locally (PRD targets 17; verified on 16.14 and 17.10, see `docs/HASIL-LANJUTAN.md`)
 
-## Run it
+## Run it (Docker Compose)
+
+One command brings up PostgreSQL, the mock ONVIF device, migrations and the API. Dummy values only.
+
+```bash
+docker compose up -d
+curl -s localhost:3000/readyz   # {"status":"ready"}
+docker compose down -v          # stop and wipe the lab volume
+```
+
+Notes:
+- The API is published on `127.0.0.1:3000` only; PostgreSQL and the mock are not published at all.
+- The mock listens on `172.28.0.3:18081` inside the compose network. The API refuses hostnames, so use that
+  literal IP and port when adding a device (`POST /v1/devices`).
+- The compose stack is a dev/lab convenience, not a production topology.
+
+## Run it (local Node)
 
 ```bash
 pnpm install --frozen-lockfile

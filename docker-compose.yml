@@ -1,0 +1,114 @@
+# AC1: docker compose untuk slice MVP-0. Hanya layanan dev, nilai DUMMY, tanpa perangkat produksi.
+# Catatan desain:
+# - API menolak nama host (wajib IP literal), jadi mock diberi IP tetap di network ini.
+# - Mock bind 0.0.0.0 di dalam container (bukan 127.0.0.1) supaya bisa dijangkau container lain.
+# - 172.28.0.0/24 termasuk rentang privat RFC1918, jadi lolos kebijakan target bawaan API.
+# - Postgres dan mock TIDAK dipublikasikan ke host; hanya API, dan hanya di loopback docker-01.
+name: labs-pantau-ac1
+
+services:
+  postgres:
+    image: postgres:17
+    container_name: labs-pantau-ac1-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      pantau-lab:
+        ipv4_address: 172.28.0.2
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    mem_limit: 512m
+    logging:
+      driver: json-file
+      options: { max-size: "1m", max-file: "3" }
+
+  mock-device:
+    image: labs-pantau-ac1-api:latest
+    container_name: labs-pantau-ac1-mock
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    command: ["pnpm", "--filter", "@pantau/mock-onvif", "exec", "tsx", "src/docker-cli.ts"]
+    environment:
+      # Bind ke IP container sendiri, bukan 0.0.0.0: mock menulis XAddrs dari host ini dan
+      # klien ONVIF menolak layanan yang alamatnya beda dari target (host pinning).
+      MOCK_HOST: 172.28.0.3
+      MOCK_PORT: "18081"
+      MOCK_USER: dummy-admin
+      MOCK_PASSWORD: dummy-password
+      MOCK_CHANNELS: "2"
+    networks:
+      pantau-lab:
+        ipv4_address: 172.28.0.3
+    mem_limit: 256m
+    logging:
+      driver: json-file
+      options: { max-size: "1m", max-file: "3" }
+
+  migrate:
+    image: labs-pantau-ac1-api:latest
+    container_name: labs-pantau-ac1-migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["pnpm", "--filter", "@pantau/db", "migrate"]
+    environment:
+      MIGRATION_DATABASE_URL: postgresql://pantau_owner:pantau_dev_pw@172.28.0.2:5432/pantau
+      APP_DB_ROLE: pantau_app
+    networks:
+      pantau-lab:
+        ipv4_address: 172.28.0.5
+    mem_limit: 256m
+    logging:
+      driver: json-file
+      options: { max-size: "1m", max-file: "3" }
+
+  api:
+    image: labs-pantau-ac1-api:latest
+    container_name: labs-pantau-ac1-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      mock-device:
+        condition: service_started
+    environment:
+      NODE_ENV: development
+      PORT: "3000"
+      BASE_URL: http://localhost:3000
+      DATABASE_URL: postgresql://pantau_app:pantau_dev_pw@172.28.0.2:5432/pantau
+      APP_DB_ROLE: pantau_app
+      AUTH_SECRET: dummy-auth-secret-dummy-auth-secret-1234
+      VAULT_KEY: BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=
+      ALLOW_LOOPBACK_TARGETS: "false"
+      ONVIF_TIMEOUT_MS: "5000"
+      SNAPSHOT_TIMEOUT_MS: "5000"
+      LOG_LEVEL: info
+    ports:
+      - "127.0.0.1:3000:3000"
+    networks:
+      pantau-lab:
+        ipv4_address: 172.28.0.4
+    mem_limit: 512m
+    logging:
+      driver: json-file
+      options: { max-size: "1m", max-file: "3" }
+
+networks:
+  pantau-lab:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
+
+volumes:
+  pgdata:
