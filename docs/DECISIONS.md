@@ -190,3 +190,6 @@ Menaikkan vitest 3 ke 4 untuk menutup 2 temuan moderate (GHSA-82fw-gwwq-j7x9, ha
 - Nasib PR #4 (Rex) dan PR #5: bentrok, tidak digabung, tidak ditutup.
 - Bentuk `noc` lintas tenant dan kejadian audit 2FA.
 - Integrasi Hik-Connect tetap rencana yang belum dibuktikan; tidak ada kode, akun, atau API vendor yang disentuh.
+
+## D38. Vitest 3 ke 4 (cabang terpisah, izin Budi)
+Dikerjakan di `claude/pantau-vitest-4`, terpisah dari PR fitur. `vitest` `^3.2.0` menjadi `^4.1.11` (terpasang 4.1.11), tanpa perubahan konfigurasi atau tes. `pnpm audit`: sebelum 3 temuan (2 moderate: vitest dan @vitest/mocker, GHSA-82fw-gwwq-j7x9; 1 low: esbuild di tsup), sesudah 1 temuan (low: esbuild lewat `apps/agent>tsup`, tidak terkait Vitest). Gerbang lokal tidak berubah: unit 304, integrasi 251, E2E 73, lint, typecheck, build hijau (Node 22 + PG16).
