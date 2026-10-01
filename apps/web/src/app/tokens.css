@@ -1,0 +1,57 @@
+/* Design tokens. Source of truth for color; apps/web/test/contrast.unit.test.ts parses this file. */
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f3f0e8;
+  --surface: #fbfaf6;
+  --raised: #ffffff;
+  --line: #8c8573;
+  --line-soft: #d6d0c1;
+  --text: #1b1913;
+  --muted: #5a5446;
+  --accent: #f2b13c;
+  --on-accent: #1a1408;
+  --accent-text: #7a4f00;
+  --danger: #a8321f;
+  --ok: #1f6b3a;
+  --viewer-bg: #0a0908;
+  --viewer-text: #efeadf;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #11100e;
+  --surface: #1a1915;
+  --raised: #24221c;
+  --line: #7d7766;
+  --line-soft: #3a372f;
+  --text: #efeadf;
+  --muted: #b7af9e;
+  --accent: #f2b13c;
+  --on-accent: #1a1408;
+  --accent-text: #f2b13c;
+  --danger: #ff9b8a;
+  --ok: #8ed9a2;
+  --viewer-bg: #0a0908;
+  --viewer-text: #efeadf;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --bg: #11100e;
+    --surface: #1a1915;
+    --raised: #24221c;
+    --line: #7d7766;
+    --line-soft: #3a372f;
+    --text: #efeadf;
+    --muted: #b7af9e;
+    --accent: #f2b13c;
+    --on-accent: #1a1408;
+    --accent-text: #f2b13c;
+    --danger: #ff9b8a;
+    --ok: #8ed9a2;
+    --viewer-bg: #0a0908;
+    --viewer-text: #efeadf;
+  }
+}

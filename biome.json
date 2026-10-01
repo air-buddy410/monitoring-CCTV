@@ -1,8 +1,45 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
-  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
-  "files": { "includes": ["**", "!**/node_modules", "!**/dist", "!docs/openapi.json", "!pnpm-lock.yaml"] },
-  "formatter": { "indentStyle": "space", "indentWidth": 2, "lineWidth": 110 },
-  "linter": { "enabled": true, "rules": { "preset": "none" } },
-  "assist": { "actions": { "source": { "organizeImports": "on" } } }
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "includes": [
+      "**",
+      "!**/node_modules",
+      "!**/dist",
+      "!**/.next",
+      "!**/.scratch",
+      "!**/test-results",
+      "!**/playwright-report",
+      "!docs/openapi.json",
+      "!pnpm-lock.yaml",
+      "!**/next-env.d.ts"
+    ]
+  },
+  "formatter": {
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 110
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "none"
+    }
+  },
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
+  }
 }

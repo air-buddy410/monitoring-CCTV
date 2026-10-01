@@ -21,7 +21,9 @@
     "dev:mock": "pnpm --filter @pantau/mock-onvif start",
     "dev:api": "pnpm --filter @pantau/api dev",
     "start": "pnpm --filter @pantau/api start",
-    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "demo": "pnpm --filter @pantau/web demo",
+    "test:e2e": "pnpm --filter @pantau/web test:e2e"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.0",

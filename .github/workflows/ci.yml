@@ -74,3 +74,51 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+  # Browser tests of the web app against the real API and PostgreSQL 17. Separate job so the backend gate above stays unchanged.
+  e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      PANTAU_TEST_ADMIN_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium for Playwright
+        run: pnpm --filter @pantau/web exec playwright install --with-deps chromium
+
+      - name: Build web app
+        run: pnpm --filter @pantau/web build
+
+      - name: Browser E2E
+        run: pnpm test:e2e
