@@ -44,11 +44,11 @@ Dijalankan dari instalasi bersih (`rm -rf node_modules .next dist` lalu `pnpm in
 | `pnpm test:unit` | exit 0, **135 lulus** (12 berkas) | exit 0, **135 lulus** |
 | `pnpm test:integration` | exit 0, **112 lulus** (12 berkas) | exit 0, **112 lulus** |
 | `pnpm build` | exit 0 (API dan web) | exit 0 |
-| `pnpm test:e2e` | exit 0, **30 lulus** (Chromium r1194, Playwright 1.56.1) | exit 0, **30 lulus** (lihat 4.2) |
+| `pnpm test:e2e` | exit 0, **39 lulus** (Chromium r1194, Playwright 1.56.1) | exit 0, **39 lulus** (lihat 4.2) |
 
 PG17 lokal adalah biner komunitas dari paket npm `@embedded-postgres/linux-x64` (17.10, port 5433). PG17 resmi (`postgres:17`, 17.11) diuji di CI GitHub (lihat bagian 9).
 
-Rincian jumlah: unit 135 = backend 66 (tidak berubah) + web 69. Integrasi 112 (tidak berubah dari HEAD awal, gerbang backend utuh). E2E 30 (baru): flow 3, access 6, errors 6, layout 12 (5 lebar x 2 tema + tema + reduced motion), controls 3.
+Rincian jumlah: unit 135 = backend 66 (tidak berubah) + web 69. Integrasi 112 (tidak berubah dari HEAD awal, gerbang backend utuh). E2E 39: flow 3, access 6, errors 6, layout 12 (5 lebar x 2 tema + tema + reduced motion), controls 3, states 4 (baru, R-1), a11y 5 (baru).
 
 ### 4.1 Baseline backend (Tahap preflight)
 Pada HEAD awal di Node 24 + PG17: lint, typecheck, build exit 0, unit 66, integrasi 112, CI success. Tidak ada blocker keamanan, tidak ada tes backend yang diubah atau dilemahkan.
@@ -201,3 +201,21 @@ Baru: `apps/web/test/*.unit.test.ts` (69 tes) dan `apps/web/e2e/*.e2e.ts` (30 te
 - Panggilan `get-active-member-role` dan `organization/list` mengandalkan perilaku Better Auth 1.7.7 yang dibaca dari kode terpasang, bukan dari dokumentasi daring.
 - Action GitHub masih dipin ke tag, bukan SHA.
 - Audit independen oleh Rex: belum dilakukan.
+
+## 11. Perbaikan setelah review independen Rex (CHANGES REQUESTED)
+
+Hanya frontend. Backend, tes backend, dan keamanan tenant, RBAC, CSRF tidak disentuh.
+
+**R-1 (blocker, kontras tombol primer saat ditekan, tema gelap): diperbaiki.** Aturan `.btn:active` mengganti latar tombol primer menjadi `--surface` sementara teks tetap `--on-accent`: #1a1408 di atas #1a1915 = 1.04:1 (gelap). Tema terang aman (latar #fbfaf6, 17.52:1) sehingga cacat ini hanya terlihat di gelap. Akar masalah tes: audit lama tidak menahan keadaan itu, jadi hanya lolos atau gagal bergantung posisi mouse sisa. Perbaikan `apps/web/src/app/globals.css`: tombol primer tetap berlatar aksen saat ditekan (on-accent di atas aksen 9.70:1, kedua tema), penanda tekan berupa bingkai dalam 2 px berwarna teks, border berwarna teks, dan geser 1 px; tombol lain tetap berganti ke `--surface` dengan geser 1 px. Semua di `@layer components`.
+
+Tes baru `apps/web/e2e/states.e2e.ts` (4 tes: 390 dan 1024 px x terang dan gelap) mengukur teks setiap kontrol (`button`, `a.btn`) pada layar masuk, detail kosong, detail dengan snapshot, dan dialog tambah, dalam keadaan rest, hover, fokus, dan **tekan ditahan** (`mouse.down` tanpa `up` saat mengukur, lalu dilepas di luar kontrol agar tidak menjadi klik). Transisi yang berjalan ditunggu selesai (`getAnimations().finished`) agar hasilnya deterministik. Bukti tes menangkap cacat: pada CSS lama tes merah di dua tema gelap (`Masuk [active] 1.04 (rgb(26,20,8) on rgb(26,25,21))`), hijau di tema terang; setelah perbaikan 4 dari 4 lulus.
+
+**R-3 (audit dependensi): tidak diubah, dilaporkan.** `pnpm audit --prod` melaporkan 2 moderate (vitest dan @vitest/mocker, GHSA-82fw-gwwq-j7x9, rentang rentan >=2.1.0 <4.1.11, perbaikan >=4.1.11) lewat jalur `apps/api > better-auth > vitest`. Penyebab: `vitest` adalah peer dependency opsional `better-auth` yang terpenuhi oleh vitest 3.2.7 milik repo ini; berkas yang memakainya hanya `better-auth/dist/test-utils`, dan tidak ada kode di `apps/api/src` atau `packages/*/src` yang mengimpornya, jadi tidak ada di jalur runtime. Perbaikan yang tersedia adalah lompatan major vitest 3 ke 4 pada seluruh pelari tes (termasuk tes backend), yang di luar batas tugas ini dan tidak diambil tanpa persetujuan. `pnpm audit` penuh: 1 low (esbuild) dan 2 moderate (vitest), semuanya jalur dev atau peer tes.
+
+**Audit aksesibilitas dan ketahanan lanjutan.** `apps/web/e2e/a11y.e2e.ts` (5 tes):
+- Fokus keyboard: menelusuri urutan Tab nyata di layar masuk, detail, detail snapshot, audit, organisasi, di dua tema; cincin fokus harus bergaris, tebal minimal 2 px, kontras minimal 3:1 terhadap permukaan di belakangnya, dan elemen fokus tidak keluar layar. Bukti: dengan warna cincin diganti sementara jadi `--line-soft`, tes merah (1.35:1); CSS dipulihkan.
+- Reflow 320 px (setara 200% pada jendela 640 px) di dua tema: tanpa overflow horizontal di login, daftar, detail, detail snapshot, audit, organisasi, dan dialog tambah tetap di dalam layar.
+- Forced colors (satu tes): kontrol tetap berbingkai dan fokus tetap bergaris.
+Layar lain (keadaan kosong, memuat, galat, 403, sesi berakhir, 429, jaringan putus) sudah tercakup tes `access` dan `errors`; tidak ditemukan celah baru yang perlu perubahan produk selain R-1.
+
+Hasil gerbang setelah perbaikan, instalasi bersih: Node 24.21.0 + PG 17.10 dan Node 22.22.0 + PG 16.14, masing-masing lint, typecheck, build exit 0; unit 135; integrasi 112; E2E 39 lulus. Status CI untuk commit ini tertera di PR #2. Kamera fisik dan live CCTV tetap BELUM TERVERIFIKASI.
