@@ -16,6 +16,8 @@ type CommandType = "ptz.command" | "snapshot.request";
 export interface CommandResult {
   ok: boolean;
   code?: string;
+  /** Only for snapshot.request: the JPEG, base64. */
+  jpegBase64?: string;
 }
 export type Handlers = Partial<
   Record<CommandType, (payload: Record<string, unknown>) => Promise<CommandResult>>
@@ -332,7 +334,11 @@ export class AgentClient extends EventEmitter {
           );
         }),
       ]);
-      reply({ ok: out.ok, ...(out.code ? { code: out.code } : {}) });
+      reply({
+        ok: out.ok,
+        ...(out.code ? { code: out.code } : {}),
+        ...(out.jpegBase64 !== undefined ? { jpegBase64: out.jpegBase64 } : {}),
+      });
     } catch {
       // the handler's message may carry device details; only a fixed code goes back
       reply({ ok: false, code: "failed" });

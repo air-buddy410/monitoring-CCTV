@@ -1,12 +1,9 @@
 import { mkdtempSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { createServer } from "node:http";
-import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Writable } from "node:stream";
 import { Agent, createLogger } from "@pantau/agent";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import WebSocket, { WebSocketServer } from "ws";
 import {
   createSite,
   createTenant,
@@ -16,57 +13,7 @@ import {
   type Tenant,
   type TestEnv,
 } from "../helpers";
-
-interface Wire {
-  dir: "agent->api" | "api->agent";
-  text: string;
-}
-
-/** A recording WebSocket relay between the agent and the API: what it sees is what is on the wire. */
-async function recordingProxy(apiWsUrl: string) {
-  const wire: Wire[] = [];
-  const upgradeAuth: string[] = [];
-  const http = createServer();
-  const wss = new WebSocketServer({ noServer: true });
-  const upstreams = new Set<WebSocket>();
-  http.on("upgrade", (req, socket, head) => {
-    upgradeAuth.push(req.headers.authorization ?? "");
-    const up = new WebSocket(`${apiWsUrl}${req.url}`, {
-      headers: { authorization: req.headers.authorization ?? "" },
-    });
-    upstreams.add(up);
-    up.on("unexpected-response", (_r, res) => {
-      socket.write(`HTTP/1.1 ${res.statusCode} X\r\nconnection: close\r\ncontent-length: 0\r\n\r\n`);
-      socket.destroy();
-    });
-    up.on("error", () => socket.destroy());
-    up.on("open", () => {
-      wss.handleUpgrade(req, socket, head, (down) => {
-        down.on("message", (d, bin) => {
-          wire.push({ dir: "agent->api", text: d.toString() });
-          up.send(d, { binary: bin });
-        });
-        up.on("message", (d, bin) => {
-          wire.push({ dir: "api->agent", text: d.toString() });
-          down.send(d, { binary: bin });
-        });
-        down.on("close", (c) => up.close(c >= 1000 && c < 5000 && c !== 1005 && c !== 1006 ? c : 1000));
-        up.on("close", (c) => down.close(c >= 1000 && c < 5000 && c !== 1005 && c !== 1006 ? c : 1000));
-      });
-    });
-  });
-  await new Promise<void>((r) => http.listen(0, "127.0.0.1", r));
-  return {
-    wire,
-    upgradeAuth,
-    url: `ws://127.0.0.1:${(http.address() as AddressInfo).port}`,
-    async stop() {
-      for (const u of upstreams) u.terminate();
-      wss.close();
-      await new Promise<void>((r) => http.close(() => r()));
-    },
-  };
-}
+import { recordingProxy } from "../wire";
 
 describe("agent end to end against the real API and a simulated ONVIF device (labelled Simulasi)", () => {
   let env: TestEnv;

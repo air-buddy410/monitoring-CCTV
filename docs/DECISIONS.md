@@ -128,7 +128,7 @@ Probe ulang perangkat, ubah atau hapus perangkat, lokasi, atau kamera, status pe
 ## D26. Inventaris dari agen
 - `inventory.sync` adalah gambaran penuh. Perangkat atau kamera yang tidak lagi dilaporkan **tidak dihapus** (grant dan riwayat bergantung padanya) tetapi ditandai `missing`, dan kembali `unknown` bila dilaporkan lagi. Nama kamera dan urutan sepenuhnya milik operator sesudah kamera ada (`PATCH /v1/cameras/:id` tidak ditimpa oleh sinkron berikutnya); kodek dan `hasPtz` mengikuti agen.
 - Status kamera dari agen: `unknown` saat dibuat, lalu `online` atau `offline` dari bingkai `status` (keterjangkauan TCP ke port ONVIF perangkat, tanpa kredensial); `device.status` mengikuti. Sebuah perangkat dari agen tidak punya baris `device_secret`.
-- Jalur langsung (D1: API menyimpan kredensial terenkripsi) **masih ada** sebagai jembatan sementara dan tidak diubah; PRD A2 baru terpenuhi untuk perangkat yang masuk lewat agen. Snapshot untuk kamera dari agen belum ada (butuh `snapshot.request` di M3); endpoint snapshot menjawab 404 `camera_not_found` untuknya karena ia memakai `device_secret`.
+- Jalur langsung (D1: API menyimpan kredensial terenkripsi) **masih ada** sebagai jembatan sementara dan tidak diubah; PRD A2 baru terpenuhi untuk perangkat yang masuk lewat agen. Snapshot untuk kamera dari agen: lihat D32 (sudah ada sejak gelombang 3).
 - `device.agent_id` dan `agent_device_key` dibuat berpasangan (CHECK) dan unik per agen; dua agen boleh memakai `deviceKey` yang sama tanpa bertabrakan.
 
 ## D27. Agen di lokasi (`apps/agent`)
@@ -136,7 +136,7 @@ Probe ulang perangkat, ubah atau hapus perangkat, lokasi, atau kamera, status pe
 - Perangkat ditambahkan di agen: kebijakan target yang sama dengan API (dipindah ke `@pantau/adapters`; `apps/api/src/target-policy.ts` kini hanya re-export), probe ONVIF baca-saja, kredensial ke vault, metadata ke inventaris. Gagal probe tidak meninggalkan apa pun. Galat yang diteruskan hanya kode stabil, bukan pesan pustaka (pesan bisa memantulkan kredensial).
 - Klien WS: `Authorization: Agent <token>`, hello lalu tunggu ack lalu `inventory.sync`, status tiap 30 dtk, ping 20 dtk dengan batas pong, ack 5 dtk, sambung ulang eksponensial 1 sampai 60 dtk dengan jitter plus minus 20 persen (fungsi murni, diuji batasnya untuk 200 percobaan dan semua tarikan acak), hitungan percobaan kembali ke nol setelah siap. 401 saat jabat tangan atau penutupan 4401 berarti dicabut: agen berhenti, tidak menghantam server. Perintah dari API dijawab dalam batas waktu per jenis (PTZ 3 dtk, snapshot 5 dtk, pencarian 15 dtk); tanpa handler dijawab `unsupported`; handler yang melempar hanya menghasilkan `failed`.
 - URL API wajib `https`/`wss` kecuali loopback atau `PANTAU_ALLOW_INSECURE=true` (lab). `PANTAU_ALLOW_LOOPBACK=true` hanya untuk simulator.
-- **Belum dikerjakan dari M2**: penemuan WS-Discovery, UI lokal onboarding (`:8080`), go2rtc, instalator dan unit systemd, image Docker agen. Tidak ada kamera fisik yang diuji; semua memakai simulator berlabel Simulasi.
+- **Dikerjakan di gelombang 3**: WS-Discovery (D33), go2rtc loopback (D34), onboarding lokal (D35), installer dan image (D36). Tidak ada kamera fisik yang diuji; semua memakai simulator berlabel Simulasi.
 
 ## D28. Perubahan tampilan yang ikut
 - Halaman baru: Keamanan, Akses, Agen. Bilah atas kini boleh membungkus baris: penambahan tautan membuat audit tata letak menemukan overflow horizontal di lebar 768 px dan itu diperbaiki, bukan dilonggarkan.
@@ -148,3 +148,45 @@ Probe ulang perangkat, ubah atau hapus perangkat, lokasi, atau kamera, status pe
 
 ## D30. Pertanyaan terbuka (tidak dilakukan)
 Menaikkan vitest 3 ke 4 untuk menutup 2 temuan moderate (GHSA-82fw-gwwq-j7x9, hanya di `better-auth/dist/test-utils`, bukan runtime) **belum dilakukan** dan menunggu jawaban Budi. Audit penuh: 2 moderate (vitest, @vitest/mocker) dan 1 low (esbuild), semuanya jalur dev atau peer tes.
+
+## D31. Grant berlaku pada seluruh akses perangkat dan kamera tenant (gelombang 3)
+- Operator dan penonton **tidak melihat apa pun** tanpa grant: daftar dan detail lokasi, perangkat, dan kamera disaring di server (`visibleScope`, `siteFilter`, `deviceFilter`, `cameraFilter` di `apps/api/src/access.ts`). Objek yang tidak terlihat dijawab 404, bukan 403, agar keberadaannya tidak bocor. Owner melihat semua; noc melihat inventaris dan konfigurasi tenantnya (tanpa video), dan RLS untuk noc tidak dilonggarkan.
+- Menulis butuh izin operate: `POST /v1/devices` butuh operate pada lokasi (403 `site_not_granted`), `PATCH /v1/sites/:id` butuh operate pada lokasi, `PATCH /v1/cameras/:id` butuh operate pada kamera (403 `camera_not_granted`). Operator yang membuat lokasi otomatis diberi grant operate pada lokasi itu (audit `grant.create`, `reason: site_creator`), kalau tidak ia tidak bisa memakai lokasinya sendiri.
+- Detail perangkat hanya memuat kamera yang terlihat. Grant kamera tidak membuka kamera lain pada perangkat yang sama.
+- UI hanya menyembunyikan dan menjelaskan. Daftar kosong untuk non-owner berbunyi "Belum ada perangkat yang bisa Anda lihat." dan menunjuk halaman Akses.
+- Tes: `inventory-grants.int.test.ts` (12) dibuktikan merah sebelum kodenya. Penyiapan 6 tes lama diberi grant lewat `giveAccess`; asersinya tidak diubah. Lima E2E diperbarui karena perilaku memang berubah (tanpa grant perangkat tidak ada, bukan tombol nonaktif); asersi baru lebih ketat (daftar API kosong, halaman 404).
+
+## D32. Snapshot lewat agen
+- Untuk kamera yang berasal dari agen, API mengirim `snapshot.request` dengan payload hanya `{deviceKey, channel}`: tanpa alamat dan tanpa kredensial. Agen mengambil kredensial dari vault, memanggil ONVIF di LAN, dan membalas JPEG base64.
+- Batas: gambar maks 1 MiB. Bingkai `snapshot.request.result` boleh sampai `MAX_SNAPSHOT_FRAME_BYTES` (sekitar 1,37 MB); semua bingkai lain tetap 128 KB. Lebih besar menutup dengan 1009. Hasil gagal tidak boleh membawa gambar.
+- Kode galat: agen offline 503 `agent_offline`, agen diam 504 `agent_timeout` (`AGENT_SNAPSHOT_TIMEOUT_MS`, bawaan 5000), kamera `missing` 409 `camera_missing`, kode perangkat dipetakan lewat `fromAdapterCode`, `snapshot_too_large` dan jawaban tak terpakai 502. Byte yang bukan JPEG (SOI ff d8 ff dan EOI ff d9) ditolak 502 `snapshot_invalid_image`.
+- Otorisasi tidak berubah: owner atau operator, 2FA bila diwajibkan, grant operate, pembatas laju, audit dengan `via: agent`. Agen ditanya hanya setelah semua pemeriksaan itu lulus. Hasil yang tidak diminta diabaikan.
+- Bukti: `agent-snapshot.int.test.ts` (13) lewat relay WS perekam, dengan pemindaian sentinel sandi di DB, log, bingkai, dan berkas.
+
+## D33. WS-Discovery (`apps/agent/src/discovery.ts`)
+- Satu Probe UDP multicast ke 239.255.255.250:3702, TTL 1 (tidak melewati router), baca saja, tanpa sandi. Jawaban harus `RelatesTo` ke MessageID kita.
+- XAddr dipercaya hanya bila http ke IP literal yang sama dengan pengirim paket, tanpa userinfo, dan lolos `checkTarget`. Alamat lain (misalnya pengalihan ke host lain atau metadata cloud) dibuang. DOCTYPE dan ENTITY ditolak, datagram maks 16 KB, hasil didedup dan dibatasi 64, nama dan lokasi dibersihkan dari karakter kontrol.
+- Bukan parser XML sengaja: hanya beberapa bidang yang diambil, jadi tidak ada ekspansi entitas dan tidak ada fetch eksternal.
+- Diuji dengan responder UDP Simulasi (`packages/mock-onvif/src/discovery.ts`). Belum diuji pada jaringan dengan kamera nyata.
+
+## D34. go2rtc terikat loopback (`apps/agent/src/go2rtc.ts`)
+- go2rtc meloloskan permintaan dari localhost tanpa otorisasi, jadi hanya proses agen yang boleh bicara dengannya dan ia tidak pernah dibuka ke LAN atau internet. Config yang ditulis ke disk hanya berisi pendengar `127.0.0.1` (api 1984, rtsp 8554, webrtc 8555) dan `local_auth: true`; tidak ada stream, tidak ada kredensial.
+- Sumber stream (yang memuat kredensial) hanya didorong lewat API lokal dari memori. Klien menolak base URL yang bukan http ke loopback tanpa userinfo, menolak nama stream di luar `[A-Za-z0-9_-]{1,64}`, hanya meneruskan sumber `rtsp://` atau `rtsps://` (go2rtc juga menerima `exec:` dan `ffmpeg:`, yang menjalankan perintah), dan pesan galatnya tidak memuat URL.
+- **Belum dibuat**: supervisor proses go2rtc dan alur live ke penonton. Tes memakai server HTTP Simulasi; biner go2rtc asli tidak ada di lingkungan ini dan tidak diunduh.
+
+## D35. Onboarding lokal agen (`pantau-agent setup`)
+- Server HTTP di agen, bawaan `127.0.0.1:8780` (`PANTAU_LOCAL_BIND`, `PANTAU_LOCAL_PORT`). Alamat bind hanya boleh loopback atau IP LAN privat literal; `0.0.0.0`, `::`, nama host, dan IP publik ditolak.
+- Masuk dengan PIN 8 digit acak yang dicetak ke konsol saja (bukan logger, bukan berkas, bukan cloud). Perbandingan waktu konstan, 5 salah beruntun mengunci 60 detik. Cookie `HttpOnly; SameSite=Strict`, sesi di memori, token CSRF per sesi, pemeriksaan `Host` (421, menahan DNS rebinding) dan `Origin` pada setiap tulis, JSON saja, badan maks 8 KB, CSP `default-src 'none'` dengan nonce, `no-store`.
+- Alur: cari (WS-Discovery) atau isi manual, isi nama pengguna dan sandi, agen menguji lewat `DeviceRegistry`, sandi langsung ke vault, hanya metadata yang kembali. Isian sandi dikosongkan setelah tiap percobaan. Galat hanya berupa kode stabil; badan permintaan tidak pernah dipantulkan.
+- Halaman memakai token DESIGN.md yang disalin ke CSS inline karena CSP ketat; tema mengikuti sistem (tanpa tombol, jadi tanpa localStorage). Font Atkinson tidak dimuat dari jaringan; tanpa font itu tampilan jatuh ke font sistem.
+- `http` biasa di LAN: PIN dan sandi lewat jaringan tanpa TLS bila bind diarahkan ke IP LAN. Bawaan loopback menghindarinya. Menyalakan bind LAN adalah keputusan operator dan harus disertai terowongan atau TLS sebelum produksi. Belum dibuat.
+
+## D36. Installer dan image agen (`deploy/agent`)
+- Dockerfile (non-root uid 10001, tanpa `EXPOSE`), compose (`network_mode: host` agar WS-Discovery dan kamera terjangkau, `read_only`, `cap_drop: ALL`, `no-new-privileges`, bind lokal tetap loopback), unit systemd dengan hardening, dan `install.sh` (wajib https, token pendaftaran dibaca tanpa echo dan tidak pernah ditulis ke disk, berkas env hanya memuat alamat).
+- **Tidak dibangun dan tidak dijalankan**: lingkungan ini tidak punya daemon Docker dan tidak ada host systemd. Yang dibuktikan hanya tes statis (`deploy.unit.test.ts`, 7): sintaks `bash -n`, tidak ada `0.0.0.0`, tidak ada rahasia, kunci hardening ada, token tidak masuk berkas env. Image belum dipin ke digest.
+
+## D37. Pertanyaan yang masih terbuka
+- Vitest 3 ke 4 tetap tidak dilakukan (D30).
+- Nasib PR #4 (Rex) dan PR #5: bentrok, tidak digabung, tidak ditutup.
+- Bentuk `noc` lintas tenant dan kejadian audit 2FA.
+- Integrasi Hik-Connect tetap rencana yang belum dibuktikan; tidak ada kode, akun, atau API vendor yang disentuh.

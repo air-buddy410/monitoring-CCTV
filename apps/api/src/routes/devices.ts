@@ -13,6 +13,14 @@ import { camera, device, deviceSecret, newId, site, withTenant } from "@pantau/d
 import { and, asc, desc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
+import {
+  cameraConfigAccess,
+  cameraFilter,
+  deviceFilter,
+  siteAccess,
+  siteFilter as siteVisible,
+  visibleScope,
+} from "../access";
 import type { Deps } from "../app";
 import { writeAudit } from "../audit";
 import { AppError, fromAdapterCode, notFound, rateLimited } from "../errors";
@@ -66,10 +74,19 @@ export function deviceRoutes(app: FastifyInstance, deps: Deps) {
         );
       }
 
-      const siteRow = await withTenant(handle.db, t.orgId, (tx) =>
-        tx.select({ id: site.id }).from(site).where(eq(site.id, body.siteId)).limit(1),
-      );
-      if (!siteRow[0]) throw notFound("site");
+      const siteCheck = await withTenant(handle.db, t.orgId, async (tx) => {
+        const scope = await visibleScope(tx, t);
+        const found = await tx
+          .select({ id: site.id })
+          .from(site)
+          .where(and(eq(site.id, body.siteId), siteVisible(scope)))
+          .limit(1);
+        if (!found[0]) return "missing" as const;
+        return (await siteAccess(tx, t, body.siteId)).allowed ? ("ok" as const) : ("denied" as const);
+      });
+      if (siteCheck === "missing") throw notFound("site");
+      if (siteCheck === "denied")
+        throw new AppError(403, "site_not_granted", "You have no operate access to this site");
 
       let probed: ProbeResult;
       try {
@@ -159,13 +176,14 @@ export function deviceRoutes(app: FastifyInstance, deps: Deps) {
     async (req) => {
       const t = requireRole(req, "viewer");
       const { siteId } = req.query;
-      const rows = await withTenant(handle.db, t.orgId, (tx) =>
-        tx
+      const rows = await withTenant(handle.db, t.orgId, async (tx) => {
+        const scope = await visibleScope(tx, t);
+        return tx
           .select()
           .from(device)
-          .where(siteId ? eq(device.siteId, siteId) : undefined)
-          .orderBy(desc(device.createdAt)),
-      );
+          .where(and(siteId ? eq(device.siteId, siteId) : undefined, deviceFilter(scope)))
+          .orderBy(desc(device.createdAt));
+      });
       return { items: rows.map(toDevice) };
     },
   );
@@ -184,14 +202,21 @@ export function deviceRoutes(app: FastifyInstance, deps: Deps) {
     async (req) => {
       const t = requireRole(req, "viewer");
       const { dev, cams } = await withTenant(handle.db, t.orgId, async (tx) => {
-        const [dev] = await tx.select().from(device).where(eq(device.id, req.params.id)).limit(1);
-        if (!dev) return { dev: undefined, cams: [] };
-        const cams = await tx
+        const scope = await visibleScope(tx, t);
+        const [dev] = await tx
           .select()
+          .from(device)
+          .where(and(eq(device.id, req.params.id), deviceFilter(scope)))
+          .limit(1);
+        if (!dev) return { dev: undefined, cams: [] };
+        // a camera-only grant shows that camera of the device, not its siblings
+        const cams = await tx
+          .select({ cam: camera })
           .from(camera)
-          .where(eq(camera.deviceId, dev.id))
+          .innerJoin(device, eq(device.id, camera.deviceId))
+          .where(and(eq(camera.deviceId, dev.id), cameraFilter(scope)))
           .orderBy(asc(camera.sortOrder));
-        return { dev, cams };
+        return { dev, cams: cams.map((c) => c.cam) };
       });
       if (!dev) throw notFound("device");
       return { device: toDevice(dev), cameras: cams.map((c) => toCamera(c, dev.siteId)) };
@@ -212,14 +237,15 @@ export function deviceRoutes(app: FastifyInstance, deps: Deps) {
     async (req) => {
       const t = requireRole(req, "viewer");
       const { siteId } = req.query;
-      const rows = await withTenant(handle.db, t.orgId, (tx) =>
-        tx
+      const rows = await withTenant(handle.db, t.orgId, async (tx) => {
+        const scope = await visibleScope(tx, t);
+        return tx
           .select({ cam: camera, siteId: device.siteId })
           .from(camera)
           .innerJoin(device, eq(device.id, camera.deviceId))
-          .where(siteId ? eq(device.siteId, siteId) : undefined)
-          .orderBy(asc(camera.deviceId), asc(camera.sortOrder)),
-      );
+          .where(and(siteId ? eq(device.siteId, siteId) : undefined, cameraFilter(scope)))
+          .orderBy(asc(camera.deviceId), asc(camera.sortOrder));
+      });
       return { items: rows.map((x) => toCamera(x.cam, x.siteId)) };
     },
   );
@@ -237,14 +263,15 @@ export function deviceRoutes(app: FastifyInstance, deps: Deps) {
     },
     async (req) => {
       const t = requireRole(req, "viewer");
-      const rows = await withTenant(handle.db, t.orgId, (tx) =>
-        tx
+      const rows = await withTenant(handle.db, t.orgId, async (tx) => {
+        const scope = await visibleScope(tx, t);
+        return tx
           .select({ cam: camera, siteId: device.siteId })
           .from(camera)
           .innerJoin(device, eq(device.id, camera.deviceId))
-          .where(and(eq(camera.id, req.params.id)))
-          .limit(1),
-      );
+          .where(and(eq(camera.id, req.params.id), cameraFilter(scope)))
+          .limit(1);
+      });
       const row = rows[0];
       if (!row) throw notFound("camera");
       return toCamera(row.cam, row.siteId);
@@ -267,20 +294,23 @@ export function deviceRoutes(app: FastifyInstance, deps: Deps) {
       const t = requireRole(req, "operator");
       const changes = req.body;
       const row = await withTenant(handle.db, t.orgId, async (tx) => {
-        const [updated] = await tx
-          .update(camera)
-          .set(changes)
-          .where(eq(camera.id, req.params.id))
-          .returning();
-        if (!updated) return undefined;
-        const [dev] = await tx
-          .select({ siteId: device.siteId })
-          .from(device)
-          .where(eq(device.id, updated.deviceId));
-        await writeAudit(tx, t, "camera.update", updated.id, { fields: Object.keys(changes) });
-        return { cam: updated, siteId: dev?.siteId ?? "" };
+        const scope = await visibleScope(tx, t);
+        const [found] = await tx
+          .select({ cam: camera, siteId: device.siteId })
+          .from(camera)
+          .innerJoin(device, eq(device.id, camera.deviceId))
+          .where(and(eq(camera.id, req.params.id), cameraFilter(scope)))
+          .limit(1);
+        if (!found) return undefined;
+        const decision = await cameraConfigAccess(tx, t, { id: found.cam.id, siteId: found.siteId });
+        if (!decision.allowed) return "denied" as const;
+        const [updated] = await tx.update(camera).set(changes).where(eq(camera.id, found.cam.id)).returning();
+        await writeAudit(tx, t, "camera.update", found.cam.id, { fields: Object.keys(changes) });
+        return { cam: updated as typeof camera.$inferSelect, siteId: found.siteId };
       });
       if (!row) throw notFound("camera");
+      if (row === "denied")
+        throw new AppError(403, "camera_not_granted", "You have no operate access to this camera");
       return toCamera(row.cam, row.siteId);
     },
   );

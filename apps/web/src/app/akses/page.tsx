@@ -379,11 +379,11 @@ function MineView({ data }: { data: Loaded }) {
         {role === "viewer"
           ? "Penonton hanya bisa melihat, dan hanya pada kamera yang diberi akses."
           : "Operator hanya mengoperasikan kamera yang diberi akses operasi."}{" "}
-        Tanpa akses, kamera tetap tampil di daftar perangkat tetapi snapshot-nya ditolak server.
+        Kamera tanpa akses tidak tampil sama sekali; server menolak permintaan ke kamera itu.
       </p>
       {rows.length === 0 ? (
         <div className="mt-4">
-          <StateBlock kind="empty" title="Belum ada kamera di organisasi ini." />
+          <StateBlock kind="empty" title="Belum ada kamera yang diberi akses kepada Anda." />
         </div>
       ) : (
         <table className="mt-4 w-full border-t border-hair text-left">

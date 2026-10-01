@@ -3,8 +3,9 @@ import {
   AgentInbound,
   containsForbiddenKey,
   type Envelope,
+  frameLimitFor,
   type InventorySync,
-  MAX_FRAME_BYTES,
+  MAX_SNAPSHOT_FRAME_BYTES,
   parseEnvelope,
   type StatusReport,
 } from "@pantau/contracts";
@@ -34,7 +35,7 @@ const unauthorized = () => new AppError(401, "agent_unauthorized", "Agent token 
 /** Same-process registry of live agents; see AgentHub. Frames carry metadata only (packages/contracts/src/agent.ts). */
 export async function agentWsRoutes(app: FastifyInstance, deps: Deps) {
   const { handle, hub, config } = deps;
-  await app.register(websocket, { options: { maxPayload: MAX_FRAME_BYTES } });
+  await app.register(websocket, { options: { maxPayload: MAX_SNAPSHOT_FRAME_BYTES } });
 
   /** Runs before the upgrade, so a bad token never gets a socket. */
   const authenticate = async (req: FastifyRequest) => {
@@ -133,9 +134,15 @@ export async function agentWsRoutes(app: FastifyInstance, deps: Deps) {
 
     async function handle1(data: RawData, isBinary: boolean) {
       if (isBinary) return refuse("-", "invalid_message", "text frames only");
-      const parsed = parseEnvelope(data.toString());
+      const text = data.toString();
+      const parsed = parseEnvelope(text, MAX_SNAPSHOT_FRAME_BYTES);
       if (!parsed.ok) return refuse("-", "invalid_message", parsed.reason);
       const env: Envelope = parsed.value;
+      // only a snapshot result may be larger than an ordinary frame
+      if (Buffer.byteLength(text) > frameLimitFor(env.type)) {
+        socket.close(1009, "frame too large");
+        return;
+      }
       if (containsForbiddenKey(env.payload)) {
         log.warn({ agentId: ctx.agentId, type: env.type }, "agent frame carried a forbidden field");
         return refuse(env.id, "forbidden_field", "frame contains a field that agents must not send");

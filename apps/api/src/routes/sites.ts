@@ -1,12 +1,13 @@
 import { IdParams, Site, SiteCreate, SiteList, SitePatch } from "@pantau/contracts";
-import { camera, device, newId, site, withTenant } from "@pantau/db";
-import { count, desc, eq } from "drizzle-orm";
+import { camera, cameraGrant, device, newId, site, withTenant } from "@pantau/db";
+import { and, count, desc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import type { z } from "zod";
+import { siteAccess, siteFilter, visibleScope } from "../access";
 import type { Deps } from "../app";
 import { writeAudit } from "../audit";
-import { notFound } from "../errors";
+import { AppError, notFound } from "../errors";
 import { requireAny, requireRole } from "../tenant";
 import { errorResponses, noContent } from "./shared";
 
@@ -40,6 +41,26 @@ export function siteRoutes(app: FastifyInstance, { handle, resolveTenant }: Deps
           .returning();
         const made = created as typeof site.$inferSelect;
         await writeAudit(tx, t, "site.create", made.id, {});
+        // an operator would otherwise not see the site they just made (default deny); owner and noc see everything
+        if (t.role === "operator") {
+          const gid = newId("grt");
+          await tx.insert(cameraGrant).values({
+            id: gid,
+            organizationId: t.orgId,
+            userId: t.userId,
+            scope: "site",
+            scopeId: made.id,
+            permission: "operate",
+            createdBy: t.userId,
+          });
+          await writeAudit(tx, t, "grant.create", gid, {
+            userId: t.userId,
+            scope: "site",
+            scopeId: made.id,
+            permission: "operate",
+            reason: "site_creator",
+          });
+        }
         return made;
       });
       return reply.status(201).send(toSite(row));
@@ -53,8 +74,12 @@ export function siteRoutes(app: FastifyInstance, { handle, resolveTenant }: Deps
     },
     async (req) => {
       const t = requireRole(req, "viewer");
-      const rows = await withTenant(handle.db, t.orgId, (tx) =>
-        tx.select().from(site).orderBy(desc(site.createdAt)),
+      const rows = await withTenant(handle.db, t.orgId, async (tx) =>
+        tx
+          .select()
+          .from(site)
+          .where(siteFilter(await visibleScope(tx, t)))
+          .orderBy(desc(site.createdAt)),
       );
       return { items: rows.map(toSite) };
     },
@@ -72,8 +97,12 @@ export function siteRoutes(app: FastifyInstance, { handle, resolveTenant }: Deps
     },
     async (req) => {
       const t = requireRole(req, "viewer");
-      const rows = await withTenant(handle.db, t.orgId, (tx) =>
-        tx.select().from(site).where(eq(site.id, req.params.id)).limit(1),
+      const rows = await withTenant(handle.db, t.orgId, async (tx) =>
+        tx
+          .select()
+          .from(site)
+          .where(and(eq(site.id, req.params.id), siteFilter(await visibleScope(tx, t))))
+          .limit(1),
       );
       if (!rows[0]) throw notFound("site");
       return toSite(rows[0]);
@@ -95,11 +124,20 @@ export function siteRoutes(app: FastifyInstance, { handle, resolveTenant }: Deps
       const t = requireRole(req, "operator");
       const changes = req.body;
       const row = await withTenant(handle.db, t.orgId, async (tx) => {
-        const [updated] = await tx.update(site).set(changes).where(eq(site.id, req.params.id)).returning();
+        const [visible] = await tx
+          .select({ id: site.id })
+          .from(site)
+          .where(and(eq(site.id, req.params.id), siteFilter(await visibleScope(tx, t))))
+          .limit(1);
+        if (!visible) return undefined;
+        if (!(await siteAccess(tx, t, visible.id)).allowed) return "denied" as const;
+        const [updated] = await tx.update(site).set(changes).where(eq(site.id, visible.id)).returning();
         if (updated) await writeAudit(tx, t, "site.update", updated.id, { fields: Object.keys(changes) });
         return updated;
       });
       if (!row) throw notFound("site");
+      if (row === "denied")
+        throw new AppError(403, "site_not_granted", "You have no operate access to this site");
       return toSite(row);
     },
   );

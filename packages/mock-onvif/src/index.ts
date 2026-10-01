@@ -295,3 +295,5 @@ export async function startDecoy(host = "127.0.0.1"): Promise<Decoy> {
       }),
   };
 }
+
+export { buildProbeMatch, type MockDiscoveryDevice, startMockDiscovery } from "./discovery";

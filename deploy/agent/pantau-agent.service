@@ -1,0 +1,35 @@
+[Unit]
+Description=PANTAU on-site agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pantau-agent
+Group=pantau-agent
+EnvironmentFile=/etc/pantau-agent/agent.env
+ExecStart=/usr/bin/node /opt/pantau-agent/dist/main.js run
+Restart=always
+RestartSec=5
+StateDirectory=pantau-agent
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target
