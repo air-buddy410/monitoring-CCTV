@@ -101,3 +101,12 @@ Gambar demo dibuat oleh skrip repo (`scripts/make-demo-frames.mjs`), adegan abst
 | Native `<dialog>` | Jebakan fokus, Escape, dan pengembalian fokus sudah dibakukan browser. |
 | Tanpa shadcn/ui | PRD menyebutnya, tetapi identitas buatan sendiri butuh komponen sendiri; dicatat di docs/DECISIONS.md D16. |
 | Proxy same-origin | Cookie sesi dan pemeriksaan Origin backend tetap berlaku tanpa melonggarkan CSRF. |
+
+## Tambahan gelombang 2 (halaman Keamanan, Akses, Agen)
+
+- **Langkah 2FA di layar masuk**: bentuk dan komposisi sama dengan layar masuk; fokus pindah ke kolom kode saat langkah terbuka, dan ada jalan keluar eksplisit (kode cadangan, Kembali). Teks galat selalu tertulis.
+- **Keamanan**: satu kolom, dua langkah bernomor. Kode QR digambar sebagai satu jalur SVG di atas latar putih (kontras pemindai terjaga di kedua tema) dengan tanda potong, dan kunci manual selalu ada untuk yang tidak bisa memindai. Kode cadangan tampil sekali, dan tombol konfirmasi baru aktif setelah ditandai tersimpan.
+- **Akses**: dikelompokkan per lokasi, tiap kamera memuat siapa yang berhak dan izinnya (teks "Lihat" atau "Operasi", bukan warna). Bagi non-pemilik halaman yang sama menjadi tabel "Akses Anda" per kamera.
+- **Agen**: satu kartu per agen dengan status bertulis (Terhubung, Tidak terhubung, Dicabut) beserta glif berbeda bentuk. "Terhubung" berarti soket aktif ke server ini, bukan kamera menyala; keterjangkauan kamera dilaporkan terpisah dan menyebut jam laporannya. Token pendaftaran tampil di dialog, sekali, dan lenyap dari halaman saat ditutup. Pencabutan selalu lewat dialog konfirmasi.
+- **Bilah atas** boleh membungkus ke baris kedua; tidak ada tautan yang terpotong atau menggulir ke samping.
+- **Tombol primer** tidak menganimasikan latar (hanya border), karena frame antara latar yang memudar di bawah teks yang berganti seketika berkontras 1,04:1.

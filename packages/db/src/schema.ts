@@ -103,6 +103,8 @@ export const device = pgTable("device", {
   port: integer("port").notNull(),
   capabilities: jsonb("capabilities").notNull().default({}),
   status: text("status").notNull().default("online"),
+  agentId: text("agent_id"),
+  agentDeviceKey: text("agent_device_key"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 export const deviceSecret = pgTable("device_secret", {
@@ -142,5 +144,32 @@ export const cameraGrant = pgTable("camera_grant", {
   scopeId: text("scope_id").notNull(),
   permission: text("permission").notNull(),
   createdBy: text("created_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+export const agent = pgTable("agent", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id").notNull(),
+  siteId: text("site_id").notNull(),
+  name: text("name").notNull(),
+  version: text("version").notNull().default(""),
+  go2rtcVersion: text("go2rtc_version"),
+  hostname: text("hostname").notNull().default(""),
+  publicKey: text("public_key").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  status: text("status").notNull().default("offline"),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+  lastStatus: jsonb("last_status"),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+export const agentEnrollment = pgTable("agent_enrollment", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id").notNull(),
+  siteId: text("site_id").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  createdBy: text("created_by"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  usedByAgentId: text("used_by_agent_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

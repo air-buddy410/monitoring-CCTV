@@ -2,6 +2,8 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
+    // Root-level on purpose: inside a project this flag is ignored, and the integration files share one database.
+    fileParallelism: false,
     projects: [
       {
         test: {
@@ -16,7 +18,6 @@ export default defineConfig({
           include: ["{apps,packages}/**/*.int.test.ts"],
           environment: "node",
           globalSetup: ["./apps/api/test/global-setup.ts"],
-          fileParallelism: false,
           testTimeout: 30_000,
           hookTimeout: 60_000,
         },

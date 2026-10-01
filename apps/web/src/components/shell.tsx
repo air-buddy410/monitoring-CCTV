@@ -22,8 +22,13 @@ function NavItems({ stacked, onNavigate }: { stacked?: boolean; onNavigate?: () 
     </Link>
   );
   return (
-    <div className={stacked ? "flex flex-col items-stretch gap-1 p-3" : "flex items-center gap-1"}>
+    <div
+      className={
+        stacked ? "flex flex-col items-stretch gap-1 p-3" : "flex flex-wrap items-center justify-end gap-1"
+      }
+    >
       {link("/perangkat", "Perangkat")}
+      {can.viewAgents(role) ? link("/agen", "Agen") : null}
       {link("/akses", "Akses")}
       {can.audit(role) ? link("/audit", "Audit") : null}
       {link("/keamanan", "Keamanan")}
@@ -51,7 +56,7 @@ function TopBar() {
         <Link href="/perangkat" className="btn btn-quiet text-lg font-extrabold tracking-[0.08em]">
           PANTAU
         </Link>
-        <nav aria-label="Utama" className="hidden min-[720px]:block">
+        <nav aria-label="Utama" className="hidden min-w-0 py-1 min-[720px]:block">
           <NavItems />
         </nav>
         <button type="button" className="btn min-[720px]:hidden" onClick={() => setMenu(true)}>

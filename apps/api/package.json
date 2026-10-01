@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@fastify/swagger": "^9.5.0",
+    "@fastify/websocket": "^11.3.1",
     "@pantau/adapters": "workspace:*",
     "@pantau/auth": "workspace:*",
     "@pantau/contracts": "workspace:*",
@@ -26,11 +27,14 @@
     "pg": "^8.13.0",
     "pino": "^10.3.1",
     "undici": "^7.30.0",
+    "ws": "^8.22.0",
     "zod": "^4.1.0"
   },
   "devDependencies": {
     "@pantau/mock-onvif": "workspace:*",
     "@types/pg": "^8.11.0",
-    "tsup": "^8.5.0"
+    "@types/ws": "^8.18.2",
+    "tsup": "^8.5.0",
+    "@pantau/agent": "workspace:*"
   }
 }

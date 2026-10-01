@@ -1,23 +1,8 @@
 import { z } from "zod";
 
-/** Capabilities follow PRD section 7. A capability is never claimed unless it was tested. */
-export const CAPABILITIES = [
-  "live",
-  "snapshot",
-  "ptz",
-  "ptz.preset",
-  "events.motion",
-  "playback.search",
-  "playback.stream",
-  "health",
-] as const;
-export type Capability = (typeof CAPABILITIES)[number];
-export const CapabilityState = z.enum(["ya", "tidak", "belum-diuji"]);
-export type CapabilityState = z.infer<typeof CapabilityState>;
-export const CapabilityMap = z.record(z.string(), CapabilityState);
-export type CapabilityMap = Record<Capability, CapabilityState>;
+export * from "./common";
 
-export const AdapterId = z.enum(["onvif-generic", "hikvision-isapi", "dahua-http"]);
+import { AdapterId, CapabilityMap, HostSchema } from "./common";
 
 export const ProblemSchema = z.object({
   type: z.string(),
@@ -72,7 +57,6 @@ export const Site = z.object({
 export const SiteList = z.object({ items: z.array(Site) });
 
 // ---- devices ----
-export const HostSchema = z.union([z.ipv4(), z.ipv6()]);
 
 /** Credentials are accepted on input only and never appear in any output schema. */
 export const DeviceCreate = z
@@ -241,3 +225,4 @@ export type AdapterErrorCode =
   | "snapshot_uri_port_not_allowed"
   | "snapshot_invalid_image"
   | "snapshot_failed";
+export * from "./agent";

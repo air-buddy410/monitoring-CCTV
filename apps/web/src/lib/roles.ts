@@ -11,6 +11,8 @@ export const can = {
   snapshot: (r: Role | null) => r === "owner" || r === "operator",
   audit: (r: Role | null) => r === "owner" || r === "noc",
   manageGrants: (r: Role | null) => r === "owner" || r === "noc",
+  viewAgents: (r: Role | null) => r === "owner" || r === "noc" || r === "operator",
+  manageAgents: (r: Role | null) => r === "owner" || r === "noc",
 };
 
 export const ROLE_LABEL: Record<Role, string> = {

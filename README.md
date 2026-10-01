@@ -1,19 +1,21 @@
-# PANTAU: MVP-0 vertical slice
+# PANTAU: backend, web, and on-site agent (PRD v0.2, M1 done, M2 started)
 
-Multi-brand CCTV/VMS (PRD `PRD-LABS-PANTAU-002` v0.2). This repository currently contains **only MVP-0**:
+Multi-brand CCTV/VMS (PRD `PRD-LABS-PANTAU-002` v0.2). The repository now contains:
 
-> add a device manually → ONVIF probe (brand/model/firmware/capabilities) → camera list → JPEG snapshot
+- **MVP-0 slice**: add a device manually, ONVIF probe, cameras, JPEG snapshot, with Better Auth organizations (tenants),
+  PostgreSQL RLS, audit log, ONVIF method whitelist, and a mock ONVIF device so nothing needs a physical camera.
+- **M1**: two-factor sign-in (TOTP and backup codes), per-camera grants, site and camera editing, audit action catalogue,
+  `/healthz` and `/readyz`.
+- **M2 (started)**: `apps/agent`, the on-site agent (outbound WebSocket, local credential vault, inventory sync, status),
+  agent enrollment and revocation endpoints.
 
-with authentication + tenants (Better Auth organizations), tenant isolation by **PostgreSQL RLS**, an **audit log**,
-an **ONVIF method whitelist** with timeouts, and a **mock ONVIF device** so nothing needs a physical camera.
+Not included yet: live video, go2rtc, WebRTC, TURN, WS-Discovery, agent local onboarding UI, NVR playback, motion
+events, PWA, pg-boss worker, Hikvision/Dahua adapters, cross-tenant `noc`. **Nothing here has been tested against a
+physical camera**; every device in tests and demos is a labelled simulation.
 
-Not included (later phases): live video / go2rtc / WebRTC / TURN, WS-Discovery, agent WebSocket, NVR playback,
-motion events, PWA, 2FA, Hikvision/Dahua adapters.
-
-The web app (`apps/web`, MVP-1) is a frontend for exactly this slice: sign in, pick an organization, add a device,
-read the probe sheet, take snapshots. See `DESIGN.md`, `docs/DEMO.md` (local "Simulasi" demo, E2E tests) and
-`docs/HASIL-FRONTEND.md` (verification results). See `docs/DECISIONS.md` for deviations from the PRD
-and `docs/HASIL-CLOUD.md` for verification results and known gaps.
+The web app (`apps/web`) covers sign-in with a second step, organizations, devices and snapshots, access grants,
+account security, agents, and audit. See `DESIGN.md`, `docs/DEMO.md`, `docs/HASIL-FRONTEND.md`, `docs/HASIL-GELOMBANG2.md`
+(wave 2 results), `docs/DECISIONS.md` (deviations from the PRD) and `docs/HASIL-CLOUD.md`.
 
 ## Requirements
 
@@ -67,21 +69,27 @@ curl -b $J localhost:3000/v1/audit
 
 | | |
 |---|---|
-| `/api/auth/*` | Better Auth: sign-up/sign-in (email+password), organizations (= tenants), active org |
-| `POST/GET /v1/sites` | minimal site (devices belong to a site) |
-| `POST /v1/devices` | add + probe (credentials accepted on input only, stored AES-256-GCM, never returned) |
-| `GET /v1/devices`, `/v1/devices/:id` | devices with capabilities and cameras |
-| `GET /v1/cameras`, `/v1/cameras/:id` | cameras |
-| `POST /v1/cameras/:id/snapshot` | `image/jpeg` |
-| `GET /v1/audit` | tenant audit log (owner only) |
-| `GET /healthz`, `/readyz` | liveness, readiness (DB) |
+| `/api/auth/*` | Better Auth: sign-up/sign-in (email+password), two-factor (`/two-factor/*`), organizations (= tenants), active org |
+| `POST/GET /v1/sites`, `GET/PATCH/DELETE /v1/sites/:id` | sites (delete: owner or noc, cascades devices, cameras, agents, grants) |
+| `POST /v1/devices` | add + probe from the API (interim path, D1): credentials accepted on input only, stored AES-256-GCM, never returned |
+| `GET /v1/devices`, `/v1/devices/:id` | devices with capabilities and cameras (including those reported by agents) |
+| `GET /v1/cameras`, `GET/PATCH /v1/cameras/:id` | cameras (PATCH: name and order only) |
+| `POST /v1/cameras/:id/snapshot` | `image/jpeg`; needs an `operate` grant for operators |
+| `GET/POST/DELETE /v1/grants` | per-camera or per-site access (owner or noc manage; others read their own) |
+| `POST /v1/sites/:id/enrollments` | single-use agent enrollment token, 24 h (owner or noc) |
+| `POST /v1/agent/enroll` | public; the enrollment token (`Authorization: Enroll ...`) is the credential |
+| `GET /v1/agents`, `/v1/agents/:id`, `POST /v1/agents/:id/revoke` | agents, status, revocation |
+| `WS /agent` | agent channel, `Authorization: Agent <token>` (hello, inventory.sync, status), see `packages/contracts/src/agent.ts` |
+| `GET /v1/audit` | tenant audit log, filter by `action`, `from`, `to` (owner or noc) |
+| `GET /healthz`, `/readyz` | liveness, readiness (named checks, 503 lists only names) |
 
 Security settings (see `.env.example`): `TARGET_ALLOW_CIDRS` (explicit device target allow-list; default private LAN ranges),
 `ALLOW_LOOPBACK_TARGETS` (lab exception), `TRUSTED_ORIGINS`, `TRUST_PROXY`, `RATE_LIMIT_*`. State-changing requests need a trusted
 `Origin` (or none, for non-browser clients); `/api/auth` calls with a session cookie must send `Origin`.
 
-Roles (Better Auth org roles → PRD roles): `owner`→owner, `admin`→operator, `member`→viewer.
-Add device / snapshot need operator+, audit needs owner, reads need any member.
+Roles (Better Auth org roles → PRD roles): `owner`→owner, `admin`→operator, `member`→viewer, `noc`→noc (see `docs/DECISIONS.md` D20).
+Add device and edit need operator or noc or owner, video (snapshot) needs owner, or operator with an `operate` grant (D21),
+grants and agents are managed by owner or noc, audit is read by owner or noc, reads need any member.
 
 ## Tests and checks
 
@@ -98,6 +106,20 @@ Add device / snapshot need operator+, audit needs owner, reads need any member.
 | `pnpm demo` | local "Simulasi" stack on http://localhost:3100 (mock ONVIF, dummy account), see `docs/DEMO.md` |
 | `pnpm verify` | lint + typecheck + test + build |
 
+### The agent
+
+```bash
+# NOC: Agen page in the web app (or POST /v1/sites/:id/enrollments) gives a one-time token.
+# On the site's mini PC (credentials are read from the environment, never from arguments):
+export PANTAU_API_URL=https://api.example.test PANTAU_AGENT_DATA_DIR=/var/lib/pantau-agent
+PANTAU_ENROLL_TOKEN=pae_... pnpm --filter @pantau/agent exec tsx src/main.ts enroll   # used once, never stored
+PANTAU_DEVICE_USER=... PANTAU_DEVICE_PASSWORD=... pnpm --filter @pantau/agent exec tsx src/main.ts add-device "NVR" 192.168.1.20 80
+pnpm --filter @pantau/agent start   # run: stays connected, reconnects with backoff
+```
+
+The device password lives only in the agent's encrypted vault (`vault/`, mode 0600); the cloud receives metadata and
+status. Lab-only switches: `PANTAU_ALLOW_LOOPBACK=true` (simulator on 127.0.0.1), `PANTAU_ALLOW_INSECURE=true` (http/ws).
+
 Integration tests need PostgreSQL and (re)create the database `pantau_test`. They connect as superuser to
 `PANTAU_TEST_ADMIN_URL` (default `postgresql://postgres:postgres@127.0.0.1:5432/postgres`; `pnpm db:setup` sets that
 dummy password). They never contact anything except in-process mocks/decoys on 127.0.0.1. CI (`.github/workflows/ci.yml`) runs the same commands on Node 24 with a PostgreSQL 17 service.
@@ -106,12 +128,13 @@ dummy password). They never contact anything except in-process mocks/decoys on 1
 
 ```
 apps/api            Fastify 5 + Zod + OpenAPI, Better Auth mount, routes, vault, target policy
-apps/web            Next.js 16 + Tailwind 4 frontend (login, organization, devices, snapshots, audit), Playwright E2E
-packages/contracts  Zod schemas shared by API (and later agent/web)
+apps/web            Next.js 16 + Tailwind 4 frontend (login + 2FA, organization, devices, snapshots, access, security, agents, audit), Playwright E2E
+apps/agent          on-site agent: enroll, credential vault, device registry, WebSocket client, CLI (`pantau-agent`)
+packages/contracts  Zod schemas shared by API, agent and web (REST and the agent protocol)
 packages/db         SQL migrations (RLS), Drizzle schema, withTenant()
-packages/auth       Better Auth config (organization plugin)
+packages/auth       Better Auth config (organization and two-factor plugins)
 packages/onvif-client  guarded wrapper around `onvif` 1.0.0-rc.3 (whitelist, host pinning, deadline)
-packages/adapters   onvif-generic probe + snapshot, HTTP Digest
+packages/adapters   onvif-generic probe + snapshot, HTTP Digest, target policy (shared by API and agent)
 packages/mock-onvif in-process mock ONVIF device (SOAP + digest snapshot) used by tests and demos
-docs/               DECISIONS.md, HASIL-CLOUD.md, openapi.json
+docs/               DECISIONS.md, HASIL-*.md, openapi.json
 ```
