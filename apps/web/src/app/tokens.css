@@ -14,6 +14,8 @@
   --accent-text: #7a4f00;
   --danger: #a8321f;
   --ok: #1f6b3a;
+  --viewer-bg: #0a0908;
+  --viewer-text: #efeadf;
 }
 
 :root[data-theme="dark"] {
@@ -30,6 +32,8 @@
   --accent-text: #f2b13c;
   --danger: #ff9b8a;
   --ok: #8ed9a2;
+  --viewer-bg: #0a0908;
+  --viewer-text: #efeadf;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -47,5 +51,7 @@
     --accent-text: #f2b13c;
     --danger: #ff9b8a;
     --ok: #8ed9a2;
+    --viewer-bg: #0a0908;
+    --viewer-text: #efeadf;
   }
 }
