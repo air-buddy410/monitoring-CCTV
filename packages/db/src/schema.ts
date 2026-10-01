@@ -93,6 +93,8 @@ export const device = pgTable("device", {
   id: text("id").primaryKey(),
   organizationId: text("organization_id").notNull(),
   siteId: text("site_id").notNull(),
+  /** Set when the device was discovered by an agent (PRD section 8); null for manually added devices. */
+  agentId: text("agent_id"),
   name: text("name").notNull(),
   kind: text("kind").notNull(),
   brand: text("brand").notNull().default(""),
@@ -142,5 +144,28 @@ export const cameraGrant = pgTable("camera_grant", {
   scopeId: text("scope_id").notNull(),
   permission: text("permission").notNull(),
   createdBy: text("created_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ---- agents (PRD section 8: agent, agent_enrollment). Tokens are stored hashed only. ----
+export const agent = pgTable("agent", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id").notNull(),
+  siteId: text("site_id").notNull(),
+  name: text("name").notNull(),
+  version: text("version").notNull().default(""),
+  publicKey: text("public_key"),
+  tokenHash: text("token_hash").notNull(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+  status: text("status").notNull().default("pending"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+export const agentEnrollment = pgTable("agent_enrollment", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id").notNull(),
+  siteId: text("site_id").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

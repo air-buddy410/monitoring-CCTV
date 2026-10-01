@@ -1,23 +1,10 @@
 import { z } from "zod";
+import { AdapterId, CapabilityMap } from "./primitives";
 
-/** Capabilities follow PRD section 7. A capability is never claimed unless it was tested. */
-export const CAPABILITIES = [
-  "live",
-  "snapshot",
-  "ptz",
-  "ptz.preset",
-  "events.motion",
-  "playback.search",
-  "playback.stream",
-  "health",
-] as const;
-export type Capability = (typeof CAPABILITIES)[number];
-export const CapabilityState = z.enum(["ya", "tidak", "belum-diuji"]);
-export type CapabilityState = z.infer<typeof CapabilityState>;
-export const CapabilityMap = z.record(z.string(), CapabilityState);
-export type CapabilityMap = Record<Capability, CapabilityState>;
-
-export const AdapterId = z.enum(["onvif-generic", "hikvision-isapi", "dahua-http"]);
+export * from "./agent";
+// Shared vocabulary lives in ./primitives and the agent wire protocol in ./agent; both are re-exported
+// here so callers keep a single import site ("@pantau/contracts").
+export * from "./primitives";
 
 export const ProblemSchema = z.object({
   type: z.string(),
@@ -90,6 +77,8 @@ export type DeviceCreate = z.infer<typeof DeviceCreate>;
 export const Device = z.object({
   id: z.string(),
   siteId: z.string(),
+  /** Null for a device added by hand; set to the discovering agent's id (PRD section 8). */
+  agentId: z.string().nullable(),
   name: z.string(),
   kind: z.enum(["nvr", "ipc"]),
   brand: z.string(),
@@ -154,6 +143,50 @@ export const GrantQuery = z.object({
   scopeId: z.string().min(1).max(100).optional(),
 });
 
+// ---- agents (PRD section 8 and 9.1/9.2) ----
+export const AGENT_STATUSES = ["pending", "online", "offline", "revoked"] as const;
+export const AgentStatus = z.enum(AGENT_STATUSES);
+export type AgentStatus = z.infer<typeof AgentStatus>;
+
+/** An enrollment is created by owner/noc for one site; it yields a single-use token with a TTL. */
+export const AgentEnrollmentCreate = z
+  .object({
+    siteId: z.string().min(1).max(100),
+    name: z.string().trim().min(1).max(120),
+    ttlMinutes: z.number().int().min(1).max(1440).default(60),
+  })
+  .strict();
+export type AgentEnrollmentCreate = z.infer<typeof AgentEnrollmentCreate>;
+/** The token is shown once and never stored in clear; it is not part of the persisted record. */
+export const AgentEnrollmentCreated = z.object({
+  id: z.string(),
+  siteId: z.string(),
+  token: z.string(),
+  expiresAt: z.string(),
+});
+export const Agent = z.object({
+  id: z.string(),
+  siteId: z.string(),
+  name: z.string(),
+  version: z.string(),
+  status: AgentStatus,
+  lastSeenAt: z.string().nullable(),
+  createdAt: z.string(),
+});
+export const AgentList = z.object({ items: z.array(Agent) });
+
+/** The agent exchanges its single-use enrollment token for a long-lived agent token. */
+export const AgentEnroll = z
+  .object({
+    token: z.string().min(1).max(300),
+    name: z.string().trim().min(1).max(120),
+    version: z.string().trim().max(64).default(""),
+    publicKey: z.string().max(4000).optional(),
+  })
+  .strict();
+export type AgentEnroll = z.infer<typeof AgentEnroll>;
+export const AgentEnrollResult = z.object({ agentId: z.string(), agentToken: z.string() });
+
 // ---- audit ----
 /** Every action name that may be written to audit_log. Adding an action means adding it here first. */
 export const AUDIT_ACTIONS = [
@@ -178,6 +211,9 @@ export const AUDIT_ACTIONS = [
   "agent.enroll.failed",
   "agent.revoke",
   "agent.inventory.sync",
+  "agent.event.received",
+  "agent.connect",
+  "agent.disconnect",
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 export const AuditActionSchema = z.enum(AUDIT_ACTIONS);

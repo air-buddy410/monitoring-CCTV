@@ -4,6 +4,7 @@ import { type CameraT, type DeviceT, EMPTY_FILTERS, filterDevices, isFiltering }
 const dev = (o: Partial<DeviceT>): DeviceT => ({
   id: "dev_1",
   siteId: "site_a",
+  agentId: null,
   name: "Gudang",
   kind: "ipc",
   brand: "hikvision",

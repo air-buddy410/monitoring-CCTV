@@ -1,5 +1,5 @@
-import type { Camera, Device } from "@pantau/contracts";
-import type { camera, device } from "@pantau/db";
+import type { Agent, Camera, Device } from "@pantau/contracts";
+import type { agent, camera, device } from "@pantau/db";
 import type { z } from "zod";
 
 type DeviceRow = typeof device.$inferSelect;
@@ -9,6 +9,7 @@ export function toDevice(r: DeviceRow): z.infer<typeof Device> {
   return {
     id: r.id,
     siteId: r.siteId,
+    agentId: r.agentId,
     name: r.name,
     kind: r.kind as "nvr" | "ipc",
     brand: r.brand,
@@ -35,5 +36,20 @@ export function toCamera(r: CameraRow, siteId: string): z.infer<typeof Camera> {
     subCodec: r.subCodec,
     status: r.status,
     sortOrder: r.sortOrder,
+  };
+}
+
+type AgentRow = typeof agent.$inferSelect;
+
+/** The token hash is deliberately absent: it must never leave the server. */
+export function toAgent(r: AgentRow): z.infer<typeof Agent> {
+  return {
+    id: r.id,
+    siteId: r.siteId,
+    name: r.name,
+    version: r.version,
+    status: r.status as z.infer<typeof Agent>["status"],
+    lastSeenAt: r.lastSeenAt ? r.lastSeenAt.toISOString() : null,
+    createdAt: r.createdAt.toISOString(),
   };
 }

@@ -32,6 +32,12 @@ describe("OpenAPI", () => {
       ["/v1/grants", "get"],
       ["/v1/grants", "post"],
       ["/v1/grants/{id}", "delete"],
+      ["/v1/sites/{id}/enrollments", "post"],
+      ["/v1/agents/enroll", "post"],
+      ["/v1/agents", "get"],
+      ["/v1/agents/{id}", "get"],
+      ["/v1/agents/{id}/revoke", "post"],
+      ["/v1/agents/{id}", "delete"],
     ];
     for (const [path, method] of expected) {
       expect(doc.paths[path]?.[method], `${method.toUpperCase()} ${path}`).toBeDefined();
