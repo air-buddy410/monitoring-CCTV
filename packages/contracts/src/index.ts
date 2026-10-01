@@ -48,6 +48,17 @@ export const Site = z.object({
 });
 export const SiteList = z.object({ items: z.array(Site) });
 
+/** All fields optional; at least one required. `strict()` rejects unknown keys (e.g. a stray id). */
+export const SiteUpdate = z
+  .object({
+    name: z.string().trim().min(1).max(120).optional(),
+    address: z.string().trim().max(300).nullable().optional(),
+    timezone: z.string().trim().min(1).max(64).optional(),
+  })
+  .strict()
+  .refine((v) => Object.keys(v).length > 0, "at least one field must be provided");
+export type SiteUpdate = z.infer<typeof SiteUpdate>;
+
 // ---- devices ----
 export const HostSchema = z.union([z.ipv4(), z.ipv6()]);
 
@@ -95,6 +106,16 @@ export const DeviceWithCameras = z.object({ device: Device, cameras: z.array(Cam
 export const DeviceList = z.object({ items: z.array(Device) });
 export const CameraList = z.object({ items: z.array(Camera) });
 export const ListQuery = z.object({ siteId: z.string().min(1).max(100).optional() });
+
+/** Camera edits are limited to the display name and manual ordering (channel/device are immutable). */
+export const CameraUpdate = z
+  .object({
+    name: z.string().trim().min(1).max(120).optional(),
+    sortOrder: z.number().int().min(0).max(10_000).optional(),
+  })
+  .strict()
+  .refine((v) => Object.keys(v).length > 0, "at least one field must be provided");
+export type CameraUpdate = z.infer<typeof CameraUpdate>;
 
 // ---- audit ----
 export const AuditItem = z.object({

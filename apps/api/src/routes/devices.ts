@@ -1,6 +1,7 @@
 import { AdapterError, onvifGenericAdapter } from "@pantau/adapters";
 import {
   CameraList,
+  CameraUpdate,
   DeviceCreate,
   DeviceList,
   DeviceWithCameras,
@@ -247,6 +248,34 @@ export function deviceRoutes(app: FastifyInstance, deps: Deps) {
       const row = rows[0];
       if (!row) throw notFound("camera");
       return toCamera(row.cam, row.siteId);
+    },
+  );
+
+  r.patch(
+    "/v1/cameras/:id",
+    {
+      preHandler: resolveTenant,
+      schema: {
+        tags: ["cameras"],
+        summary: "Rename or reorder a camera (channel and device are immutable)",
+        params: IdParams,
+        body: CameraUpdate,
+        response: { 200: CameraList.shape.items.element, ...errorResponses },
+      },
+    },
+    async (req) => {
+      const t = requireRole(req, "operator");
+      const updated = await withTenant(handle.db, t.orgId, async (tx) => {
+        const rows = await tx.update(camera).set(req.body).where(eq(camera.id, req.params.id)).returning();
+        const row = rows[0];
+        if (row) await writeAudit(tx, t, "camera.update", row.id, { fields: Object.keys(req.body) });
+        return row;
+      });
+      if (!updated) throw notFound("camera");
+      const siteRow = await withTenant(handle.db, t.orgId, (tx) =>
+        tx.select({ siteId: device.siteId }).from(device).where(eq(device.id, updated.deviceId)).limit(1),
+      );
+      return toCamera(updated as typeof camera.$inferSelect, siteRow[0]?.siteId ?? "");
     },
   );
 }
