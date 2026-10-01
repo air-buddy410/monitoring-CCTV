@@ -56,6 +56,40 @@ const BY_CODE: Record<string, Message> = {
   },
   network_error: { title: "Server tidak dapat dihubungi.", hint: "Periksa koneksi, lalu coba lagi." },
   internal_error: { title: "Server mengalami galat.", hint: "Coba lagi sebentar lagi." },
+  camera_not_granted: {
+    title: "Anda belum diberi akses operasi ke kamera ini.",
+    hint: "Minta pemilik memberi akses di halaman Akses.",
+  },
+  two_factor_required: {
+    title: "Verifikasi dua langkah wajib untuk melihat video.",
+    hint: "Aktifkan di halaman Keamanan, lalu coba lagi.",
+  },
+  grant_exists: {
+    title: "Anggota ini sudah punya akses ke target itu.",
+    hint: "Cabut dulu bila ingin mengubahnya.",
+  },
+  member_not_found: { title: "Anggota itu tidak ada di organisasi ini." },
+  grant_not_found: { title: "Akses itu sudah tidak ada.", hint: "Muat ulang daftar akses." },
+  INVALID_CODE: {
+    title: "Kode salah.",
+    hint: "Kode berganti tiap 30 detik. Masukkan kode yang sedang tampil.",
+  },
+  INVALID_BACKUP_CODE: { title: "Kode cadangan salah atau sudah dipakai." },
+  INVALID_TWO_FACTOR_COOKIE: {
+    title: "Verifikasi kedaluwarsa.",
+    hint: "Masuk lagi dengan email dan kata sandi.",
+  },
+  TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE: {
+    title: "Terlalu banyak kode salah.",
+    hint: "Masuk lagi dengan email dan kata sandi untuk memulai ulang.",
+  },
+  ACCOUNT_TEMPORARILY_LOCKED: {
+    title: "Akun dikunci sementara karena terlalu banyak kode salah.",
+    hint: "Coba lagi nanti.",
+  },
+  TOTP_ALREADY_ENABLED: { title: "Verifikasi dua langkah sudah aktif." },
+  TWO_FACTOR_NOT_ENABLED: { title: "Verifikasi dua langkah belum aktif." },
+  INVALID_PASSWORD: { title: "Kata sandi salah." },
   INVALID_EMAIL_OR_PASSWORD: { title: "Email atau kata sandi salah." },
   USER_ALREADY_EXISTS: { title: "Email ini sudah terdaftar.", hint: "Masuk dengan email itu." },
   USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL: {

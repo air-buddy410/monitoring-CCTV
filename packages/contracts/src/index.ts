@@ -32,13 +32,36 @@ export type Problem = z.infer<typeof ProblemSchema>;
 export const IdParams = z.object({ id: z.string().min(1).max(100) });
 
 // ---- sites ----
+const isTimeZone = (tz: string): boolean => {
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+};
+const TimeZone = z
+  .string()
+  .trim()
+  .min(1)
+  .max(64)
+  .refine(isTimeZone, "must be an IANA time zone such as Asia/Makassar");
 export const SiteCreate = z
   .object({
     name: z.string().trim().min(1).max(120),
     address: z.string().trim().max(300).optional(),
-    timezone: z.string().trim().min(1).max(64).default("Asia/Makassar"),
+    timezone: TimeZone.default("Asia/Makassar"),
   })
   .strict();
+/** At least one field; `address: null` clears it. Never accepts organization or id fields. */
+export const SitePatch = z
+  .object({
+    name: z.string().trim().min(1).max(120).optional(),
+    address: z.string().trim().max(300).nullable().optional(),
+    timezone: TimeZone.optional(),
+  })
+  .strict()
+  .refine((v) => Object.keys(v).length > 0, "at least one field is required");
 export const Site = z.object({
   id: z.string(),
   name: z.string(),
@@ -91,12 +114,86 @@ export const Camera = z.object({
   status: z.string(),
   sortOrder: z.number().int(),
 });
+/** Only the name and the position are operator-editable; capabilities come from probing, never from users. */
+export const CameraPatch = z
+  .object({
+    name: z.string().trim().min(1).max(120).optional(),
+    sortOrder: z.number().int().min(0).max(10_000).optional(),
+  })
+  .strict()
+  .refine((v) => Object.keys(v).length > 0, "at least one field is required");
 export const DeviceWithCameras = z.object({ device: Device, cameras: z.array(Camera) });
 export const DeviceList = z.object({ items: z.array(Device) });
 export const CameraList = z.object({ items: z.array(Camera) });
 export const ListQuery = z.object({ siteId: z.string().min(1).max(100).optional() });
 
+// ---- grants (PRD section 8: camera_grant) ----
+export const GRANT_SCOPES = ["site", "camera"] as const;
+export const GRANT_PERMISSIONS = ["view", "operate"] as const;
+export const GrantCreate = z
+  .object({
+    userId: z.string().min(1).max(100),
+    scope: z.enum(GRANT_SCOPES),
+    scopeId: z.string().min(1).max(100),
+    permission: z.enum(GRANT_PERMISSIONS),
+  })
+  .strict();
+export const Grant = z.object({
+  id: z.string(),
+  userId: z.string(),
+  scope: z.enum(GRANT_SCOPES),
+  scopeId: z.string(),
+  permission: z.enum(GRANT_PERMISSIONS),
+  createdBy: z.string().nullable(),
+  createdAt: z.string(),
+});
+export const GrantList = z.object({ items: z.array(Grant) });
+export const GrantQuery = z.object({
+  userId: z.string().min(1).max(100).optional(),
+  scope: z.enum(GRANT_SCOPES).optional(),
+  scopeId: z.string().min(1).max(100).optional(),
+});
+
 // ---- audit ----
+/** Every action name that may be written to audit_log. Adding an action means adding it here first. */
+export const AUDIT_ACTIONS = [
+  "device.create",
+  "device.create.failed",
+  "camera.snapshot",
+  "camera.snapshot.failed",
+  "camera.snapshot.denied",
+  "camera.update",
+  "camera.view.start",
+  "camera.view.stop",
+  "camera.ptz",
+  "camera.playback.start",
+  "camera.playback.stop",
+  "site.create",
+  "site.update",
+  "site.delete",
+  "grant.create",
+  "grant.delete",
+  "agent.enrollment.create",
+  "agent.enroll",
+  "agent.enroll.failed",
+  "agent.revoke",
+  "agent.inventory.sync",
+] as const;
+export type AuditAction = (typeof AUDIT_ACTIONS)[number];
+export const AuditActionSchema = z.enum(AUDIT_ACTIONS);
+/** Keys that must never be stored in audit meta, whatever the caller passes. */
+export const FORBIDDEN_AUDIT_META_KEYS = [
+  "password",
+  "passwd",
+  "token",
+  "authorization",
+  "secret",
+  "credentials",
+  "credential",
+  "rtsp",
+  "cookie",
+  "apikey",
+] as const;
 export const AuditItem = z.object({
   id: z.string(),
   actorId: z.string().nullable(),
@@ -109,7 +206,14 @@ export const AuditItem = z.object({
 export const AuditList = z.object({ items: z.array(AuditItem) });
 export const AuditQuery = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
+  action: AuditActionSchema.optional(),
+  from: z.iso.datetime({ offset: true }).optional(),
+  to: z.iso.datetime({ offset: true }).optional(),
 });
+
+// ---- health ----
+export const ReadyResponse = z.object({ status: z.literal("ready"), checks: z.array(z.string()) });
+export const NotReadyResponse = z.object({ status: z.literal("unavailable"), failed: z.array(z.string()) });
 
 /** Result of probing a device through an adapter. Contains no credentials. */
 export interface ProbedChannel {

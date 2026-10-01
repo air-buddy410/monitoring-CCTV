@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "@/components/session";
 import { StateBlock } from "@/components/ui";
+import { snapshotAccess } from "@/lib/access";
 import { ApiError, postSnapshot } from "@/lib/api";
 import { describeError } from "@/lib/errors";
 import { AddDeviceDialog } from "./add-device-dialog";
@@ -143,7 +144,7 @@ export function Workspace() {
             <>
               <SnapshotStage
                 camera={view.camera}
-                role={role}
+                access={snapshotAccess(role, view.camera, data.grants)}
                 shot={shots[view.camera.id] ?? { status: "idle" }}
                 onTake={() => void take((view.camera as { id: string }).id)}
               />

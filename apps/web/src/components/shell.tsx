@@ -24,7 +24,9 @@ function NavItems({ stacked, onNavigate }: { stacked?: boolean; onNavigate?: () 
   return (
     <div className={stacked ? "flex flex-col items-stretch gap-1 p-3" : "flex items-center gap-1"}>
       {link("/perangkat", "Perangkat")}
+      {link("/akses", "Akses")}
       {can.audit(role) ? link("/audit", "Audit") : null}
+      {link("/keamanan", "Keamanan")}
       {org.name ? (
         <div className={stacked ? "px-3 py-2" : "mx-2 hidden min-[1000px]:block"}>
           <span className="text-muted">Organisasi </span>

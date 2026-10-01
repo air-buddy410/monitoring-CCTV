@@ -7,8 +7,18 @@ export const user = pgTable("user", {
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").notNull().default(false),
   image: text("image"),
+  twoFactorEnabled: boolean("two_factor_enabled").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+export const twoFactor = pgTable("two_factor", {
+  id: text("id").primaryKey(),
+  secret: text("secret").notNull(),
+  backupCodes: text("backup_codes").notNull(),
+  userId: text("user_id").notNull(),
+  verified: boolean("verified").notNull().default(true),
+  failedVerificationCount: integer("failed_verification_count").notNull().default(0),
+  lockedUntil: timestamp("locked_until", { withTimezone: true }),
 });
 export const organization = pgTable("organization", {
   id: text("id").primaryKey(),
@@ -123,4 +133,14 @@ export const auditLog = pgTable("audit_log", {
   ip: text("ip"),
   at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
   meta: jsonb("meta").notNull().default({}),
+});
+export const cameraGrant = pgTable("camera_grant", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id").notNull(),
+  userId: text("user_id").notNull(),
+  scope: text("scope").notNull(),
+  scopeId: text("scope_id").notNull(),
+  permission: text("permission").notNull(),
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

@@ -10,7 +10,14 @@ import { StateBlock } from "./ui";
 const SessionSchema = z
   .object({
     session: z.object({ activeOrganizationId: z.string().nullish() }).passthrough(),
-    user: z.object({ id: z.string(), name: z.string(), email: z.string() }).passthrough(),
+    user: z
+      .object({
+        id: z.string(),
+        name: z.string(),
+        email: z.string(),
+        twoFactorEnabled: z.boolean().nullish(),
+      })
+      .passthrough(),
   })
   .nullable();
 const OrgsSchema = z.array(
@@ -23,7 +30,7 @@ export interface Org {
   name: string;
 }
 export interface SessionValue {
-  user: { id: string; name: string; email: string };
+  user: { id: string; name: string; email: string; twoFactorEnabled: boolean };
   org: Org;
   orgs: Org[];
   role: Role | null;
@@ -56,8 +63,9 @@ export function SessionGate({ children, needOrg = true }: { children: ReactNode;
     let alive = true;
     (async () => {
       try {
-        const s = await getJson("/api/auth/get-session", SessionSchema);
-        if (!s) return router.replace(`/login?next=${encodeURIComponent(path)}`);
+        const raw = await getJson("/api/auth/get-session", SessionSchema);
+        if (!raw) return router.replace(`/login?next=${encodeURIComponent(path)}`);
+        const s = { ...raw, user: { ...raw.user, twoFactorEnabled: raw.user.twoFactorEnabled === true } };
         const orgs = (await getJson("/api/auth/organization/list", OrgsSchema)).map((o) => ({
           id: o.id,
           name: o.name,

@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import { GlyphDownload, GlyphExpand, GlyphRepeat } from "@/components/glyphs";
 import { Dialog, StateBlock } from "@/components/ui";
+import { ACCESS_HINT, type Access } from "@/lib/access";
 import type { Frame } from "@/lib/api";
 import { describeError, type Message } from "@/lib/errors";
 import { formatBytes, formatClock } from "@/lib/format";
-import { can, type Role } from "@/lib/roles";
 import type { CameraT } from "./data";
 
 export type ShotState =
@@ -17,7 +17,7 @@ export type ShotState =
 
 interface Props {
   camera: CameraT;
-  role: Role | null;
+  access: Access;
   shot: ShotState;
   onTake: () => void;
 }
@@ -32,14 +32,14 @@ function useCountdown(until?: number): number {
   return until ? Math.max(0, Math.ceil((until - now) / 1000)) : 0;
 }
 
-export function SnapshotStage({ camera, role, shot, onTake }: Props) {
+export function SnapshotStage({ camera, access, shot, onTake }: Props) {
   const [full, setFull] = useState(false);
   const [broken, setBroken] = useState(false);
   const retryIn = useCountdown(shot.status === "error" ? shot.retryUntil : undefined);
   const frameUrl = shot.status === "ready" ? shot.frame.url : null;
   useEffect(() => setBroken(false), [frameUrl]);
 
-  const allowed = can.snapshot(role);
+  const allowed = access.allowed;
   const busy = shot.status === "loading";
   const showFrame = shot.status === "ready" && !broken;
   const message: Message | null =
@@ -78,7 +78,11 @@ export function SnapshotStage({ camera, role, shot, onTake }: Props) {
                 />
               ) : message ? (
                 <StateBlock
-                  kind={message.title.startsWith("Peran") ? "forbidden" : "error"}
+                  kind={
+                    message.title.startsWith("Peran") || message.title.startsWith("Anda belum")
+                      ? "forbidden"
+                      : "error"
+                  }
                   title={message.title}
                   hint={message.hint}
                 />
@@ -89,7 +93,7 @@ export function SnapshotStage({ camera, role, shot, onTake }: Props) {
                   hint={
                     allowed
                       ? "Tekan Ambil snapshot untuk meminta satu gambar dari perangkat. Ini bukan video langsung."
-                      : "Peran Anda hanya dapat melihat data. Mengambil snapshot memerlukan peran operator."
+                      : ACCESS_HINT[access.allowed ? "role" : access.reason]
                   }
                 />
               )}

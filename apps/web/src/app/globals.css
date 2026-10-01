@@ -94,10 +94,12 @@
     color: var(--muted);
     border-style: dashed;
   }
+  /* Fill and text swap in the same frame: a fading fill under instantly changed text gives frames below 4.5:1. */
   .btn-primary {
     background: var(--accent);
     border-color: var(--accent);
     color: var(--on-accent);
+    transition: border-color 100ms;
   }
   .btn-primary:hover:not(:disabled) {
     border-color: var(--text);

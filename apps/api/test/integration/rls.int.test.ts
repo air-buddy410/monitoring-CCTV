@@ -66,9 +66,9 @@ describe("PostgreSQL RLS", () => {
     const r = await admin.query(
       `select relname, relrowsecurity, relforcerowsecurity from pg_class
        where relname = any($1) and relkind = 'r'`,
-      [["site", "device", "device_secret", "camera", "audit_log"]],
+      [["site", "device", "device_secret", "camera", "audit_log", "camera_grant"]],
     );
-    expect(r.rows).toHaveLength(5);
+    expect(r.rows).toHaveLength(6);
     for (const row of r.rows) {
       expect(row, row.relname).toMatchObject({ relrowsecurity: true, relforcerowsecurity: true });
     }

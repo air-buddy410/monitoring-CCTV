@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import {
   closeDb,
   db,
+  grantAccess,
   loginUi,
   newMember,
   newTenant,
@@ -62,7 +63,9 @@ test("operator menambah perangkat dan mengambil snapshot, tetapi tidak membaca a
   const mock = await startMock({ channels: 1 });
   const owner = await newTenant("own2");
   const operator = await newMember(owner, "operator", "admin");
-  const { device } = await seedDevice(owner, mock, "Milik Pemilik");
+  const { device, cameras } = await seedDevice(owner, mock, "Milik Pemilik");
+  // Video access is default-deny for operators: the owner grants this camera first.
+  await grantAccess(owner, operator.userId, "camera", cameras[0]?.id as string, "operate");
   await signInAs(context, operator);
   const w = watch(page, [403]);
 
