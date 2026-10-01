@@ -10,7 +10,7 @@ Gelombang 2 dari PRD v0.2 (bagian 12). Semua pekerjaan memakai data dummy dan si
 | `claude/pantau-w2-m1` | [#3](https://github.com/air-buddy410/monitoring-CCTV/pull/3) (draft, basis `claude/pantau-web-mvp1`) | M1: 2FA, grant, CRUD, katalog audit, readiness | hijau untuk `77449c0` (verify dan e2e, 2 run) |
 | `claude/pantau-w2-m2-agent` | PR #4 (draft, basis `claude/pantau-w2-m1`) | M2 awal: agen, pendaftaran, protokol WS, halaman Agen | lihat bagian 8 |
 
-Tes ditulis lebih dulu dan terbukti merah sebelum kodenya, untuk semua tes backend, kontrak, dan agen (kegagalan awal dicatat di riwayat commit). Pengecualian jujur: tes E2E UI halaman Agen (`agents.e2e.ts`) ditulis sebelum halamannya tetapi **tidak dijalankan merah** terlebih dulu; ia langsung dijalankan sesudah halaman jadi.
+Tes ditulis lebih dulu dan terbukti merah sebelum kodenya untuk: CRUD site dan kamera, grant, 2FA, readiness, katalog audit (51 gagal), kontrak agen, pendaftaran dan agen (15 gagal), WebSocket agen (tidak ada rute, tes menggantung), dan 5 berkas unit agen. Pengecualian jujur, yang ditulis sebelum kodenya tetapi **tidak dijalankan merah** terlebih dulu: `agent-e2e.int.test.ts`, `agents.e2e.ts` (halaman Agen), tes E2E 2FA dan grant, dan tes layar M1; `env.unit.test.ts` ditulis bersama kodenya. Untuk pemindaian kebocoran, merahnya dibuktikan dengan mutasi (bagian 4).
 
 ## 2. Gerbang (instalasi bersih, `pnpm install --frozen-lockfile`)
 
@@ -34,7 +34,7 @@ Sebelum gelombang ini (HEAD `a4611f4`): unit 135, integrasi 112, E2E 39. Tambaha
 | 3 | PATCH/DELETE `/v1/sites/:id`, PATCH `/v1/cameras/:id` | Selesai (juga `GET /v1/sites/:id`) | `sites-cameras-crud.int.test.ts` (12) |
 | 4 | Aksi audit tontonan dan perintah | Selesai sebagai katalog dan pintu tunggal | `audit-actions.int.test.ts` (5), `audit-catalogue.unit.test.ts` (2); belum ada endpoint live, PTZ, playback yang memakainya |
 | 5 | `/healthz` dan `/readyz` (DB, nanti pg-boss) | Selesai; titik pasang pg-boss siap, pg-boss belum ada | `health.int.test.ts` (6) |
-| 6 | `apps/agent`: WS dengan `Authorization: Agent`, hello, inventory.sync, status 30 dtk, backoff 1 sampai 60 dtk dengan jitter, heartbeat 20 dtk, batas waktu per permintaan | Selesai untuk lingkup ini | 64 tes unit di `apps/agent/test`, `agent-e2e.int.test.ts` (9) |
+| 6 | `apps/agent`: WS dengan `Authorization: Agent`, hello, inventory.sync, status 30 dtk, backoff 1 sampai 60 dtk dengan jitter, heartbeat 20 dtk, batas waktu per permintaan | Selesai untuk lingkup ini | 66 tes unit di `apps/agent/test`, `agent-e2e.int.test.ts` (9) |
 | 7 | Skema Zod pesan agen (amplop `{id,type,ts,payload}`) dan endpoint agen | Selesai | `packages/contracts/src/agent.ts`, `agent.unit.test.ts` (11) |
 | 8 | `POST /v1/sites/:id/enrollments`, `GET /v1/agents`, `GET /v1/agents/:id`, `POST /v1/agents/:id/revoke`; token disimpan sebagai hash | Selesai (ditambah `POST /v1/agent/enroll`, D25) | `agent-enrollment.int.test.ts` (22), `agent-ws.int.test.ts` (24), `agents.e2e.ts` (3) |
 | 9 | Vault kredensial di agen, bukan di DB cloud untuk jalur agen | Selesai | `vault.unit.test.ts` (11), `devices.unit.test.ts` (10), pemindaian sentinel di `agent-e2e` |
