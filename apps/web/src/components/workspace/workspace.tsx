@@ -105,7 +105,7 @@ export function Workspace() {
         </p>
       ) : null}
       <div
-        className={`grid gap-6 min-[720px]:grid-cols-[300px_minmax(0,1fr)] min-[1200px]:grid-cols-[320px_minmax(0,1fr)_340px] ${selected ? "max-[719px]:pb-24" : ""}`}
+        className={`grid gap-6 min-[720px]:grid-cols-[300px_minmax(0,1fr)] min-[1200px]:grid-cols-[320px_minmax(0,1fr)_340px] ${selected ? "max-[719px]:pb-44" : ""}`}
       >
         <div className="min-w-0 min-[720px]:col-start-1 min-[720px]:row-span-2 min-[720px]:row-start-1 min-[1200px]:row-span-1">
           <DeviceRail

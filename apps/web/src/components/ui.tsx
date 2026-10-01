@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useEffect, useId, useRef, useSyncExternalStore } from "react";
+import { type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useSyncExternalStore } from "react";
 import type { Message } from "@/lib/errors";
 import { GlyphAlert, GlyphClose } from "./glyphs";
 
@@ -14,6 +14,28 @@ export function useMediaQuery(query: string): boolean {
     () => window.matchMedia(query).matches,
     () => false,
   );
+}
+
+const FOCUSABLE =
+  'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),summary,[tabindex]:not([tabindex="-1"])';
+
+/** Keeps Tab and Shift+Tab inside the modal by wrapping from the last control to the first and back. */
+function cycleFocus(e: KeyboardEvent<HTMLDialogElement>) {
+  if (e.key !== "Tab") return;
+  const items = [...e.currentTarget.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
+    (el) => el.getClientRects().length > 0,
+  );
+  const first = items[0];
+  const last = items[items.length - 1];
+  if (!first || !last) return;
+  const active = document.activeElement;
+  if (e.shiftKey && (active === first || !e.currentTarget.contains(active))) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && (active === last || !e.currentTarget.contains(active))) {
+    e.preventDefault();
+    first.focus();
+  }
 }
 
 interface DialogProps {
@@ -37,7 +59,13 @@ export function Dialog({ open, onClose, title, children, className, bare }: Dial
     if (!open && d.open) d.close();
   }, [open]);
   return (
-    <dialog ref={ref} aria-labelledby={titleId} onClose={onClose} className={className}>
+    <dialog
+      ref={ref}
+      aria-labelledby={titleId}
+      onClose={onClose}
+      onKeyDown={cycleFocus}
+      className={className}
+    >
       {open && (
         <div className={bare ? "" : "flex max-h-[inherit] flex-col"}>
           <div
@@ -76,7 +104,7 @@ export function StateBlock({ kind, title, hint, action }: StateBlockProps) {
   const isError = kind === "error" || kind === "forbidden" || kind === "expired";
   return (
     <div
-      className="border border-hair bg-panel p-4"
+      className="border border-hair bg-panel p-4 text-ink"
       role={isError ? "alert" : "status"}
       aria-busy={kind === "loading" ? true : undefined}
       data-state={kind}

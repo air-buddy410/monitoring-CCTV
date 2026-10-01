@@ -63,7 +63,12 @@ export function SessionGate({ children, needOrg = true }: { children: ReactNode;
           name: o.name,
         }));
         const activeId = s.session.activeOrganizationId ?? null;
-        const org = orgs.find((o) => o.id === activeId);
+        let org = orgs.find((o) => o.id === activeId);
+        // A fresh login has no active organization; with exactly one there is nothing to choose.
+        if (!org && needOrg && orgs.length === 1 && orgs[0]) {
+          await postVoid("/api/auth/organization/set-active", { organizationId: orgs[0].id });
+          org = orgs[0];
+        }
         if (!org) {
           if (needOrg) return router.replace("/organisasi");
           if (alive) setValue({ user: s.user, org: { id: "", name: "" }, orgs, role: null, signOut });

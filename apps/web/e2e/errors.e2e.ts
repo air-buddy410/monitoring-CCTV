@@ -73,9 +73,13 @@ test("kesalahan nyata dari backend: kredensial salah, alamat di luar kebijakan, 
 
   await dialog.getByLabel("Alamat IP").fill(hung.host);
   await dialog.getByLabel("Port").fill(String(hung.port));
+  await dialog.getByLabel("Kata sandi perangkat").fill(DEVICE_PASSWORD);
   await dialog.getByRole("button", { name: "Tambah dan probe" }).click();
   await expect(dialog.getByText("Perangkat tidak menjawab tepat waktu.")).toBeVisible({ timeout: 15_000 });
 
+  // Closing the dialog discards the typed secret from the page.
+  await dialog.getByRole("button", { name: "Batal" }).click();
+  await expect(dialog).toBeHidden();
   await noLeaks(page, w, [DEVICE_PASSWORD, "Wrong-Dummy-Pw-0000!"]);
   expect(w.consoleErrors, w.consoleErrors.join("\n")).toEqual([]);
   await mock.stop();

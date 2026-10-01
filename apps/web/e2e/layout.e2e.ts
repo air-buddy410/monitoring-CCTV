@@ -38,8 +38,7 @@ async function audit(page: Page): Promise<Report> {
       if (r.left < -0.5 || r.right > vw + 0.5)
         out.clipped.push(`${name(el)} ${Math.round(r.left)}..${Math.round(r.right)} of ${vw}`);
     }
-    const parse = (c: string) =>
-      (c.match(/[\d.]+/g) ?? []).slice(0, 4).map(Number) as [number, number, number, number?];
+    const parse = (c: string): number[] => (c.match(/[\d.]+/g) ?? []).slice(0, 4).map(Number);
     const lin = (v: number) => {
       const c = v / 255;
       return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;

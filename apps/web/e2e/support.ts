@@ -172,10 +172,14 @@ export async function noLeaks(page: Page, w: Watch, secrets: string[]) {
     JSON.stringify({ l: { ...localStorage }, s: { ...sessionStorage } }),
   );
   for (const s of secrets) {
-    expect(html, "page HTML").not.toContain(s);
-    expect(storage, "web storage").not.toContain(s);
-    for (const u of w.urls) expect(decodeURIComponent(u), "request URL").not.toContain(s);
-    expect(w.consoleErrors.join("\n"), "console").not.toContain(s);
+    // booleans on purpose: a failing expect must not print the whole page
+    expect(html.includes(s), "page HTML contains a secret").toBe(false);
+    expect(storage.includes(s), "web storage contains a secret").toBe(false);
+    expect(
+      w.urls.some((u) => decodeURIComponent(u).includes(s)),
+      "a request URL contains a secret",
+    ).toBe(false);
+    expect(w.consoleErrors.join("\n").includes(s), "console contains a secret").toBe(false);
   }
   const keys = Object.keys(JSON.parse(storage).l);
   expect(

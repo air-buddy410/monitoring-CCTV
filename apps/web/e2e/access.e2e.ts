@@ -142,7 +142,9 @@ test("sesi berakhir: kembali ke login dengan pesan, lalu lanjut ke halaman semul
   await page.getByLabel("Email").fill(t.email);
   await page.getByLabel("Kata sandi").fill(USER_PASSWORD);
   await page.getByRole("button", { name: "Masuk", exact: true }).click();
-  await expect(page).toHaveURL(new RegExp(`/perangkat\\?d=${device.id}`));
+  // The final state matters, not a URL that is only passed through on the way.
+  await expect(page.getByRole("region", { name: "Lembar probe" })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`localhost:3100/perangkat\\?d=${device.id}`));
   expect(w.consoleErrors, w.consoleErrors.join("\n")).toEqual([]);
   await mock.stop();
 });

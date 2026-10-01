@@ -110,14 +110,14 @@ export function SnapshotStage({ camera, role, shot, onTake }: Props) {
       </figure>
 
       <div
-        className="mt-4 flex flex-wrap gap-2 max-[719px]:fixed max-[719px]:inset-x-0 max-[719px]:bottom-0 max-[719px]:z-10 max-[719px]:mt-0 max-[719px]:border-t max-[719px]:border-hair max-[719px]:bg-panel max-[719px]:p-3 max-[719px]:pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+        className="mt-4 flex flex-wrap gap-2 max-[719px]:fixed max-[719px]:grid max-[719px]:grid-cols-2 max-[719px]:inset-x-0 max-[719px]:bottom-0 max-[719px]:z-10 max-[719px]:mt-0 max-[719px]:border-t max-[719px]:border-hair max-[719px]:bg-panel max-[719px]:p-3 max-[719px]:pb-[max(0.75rem,env(safe-area-inset-bottom))]"
         role="group"
         aria-label="Aksi snapshot"
       >
         {allowed ? (
           <button
             type="button"
-            className="btn btn-primary"
+            className="btn btn-primary max-[719px]:col-span-2"
             onClick={onTake}
             disabled={busy || retryIn > 0}
             aria-busy={busy}
