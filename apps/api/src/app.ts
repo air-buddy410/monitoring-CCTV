@@ -9,11 +9,13 @@ import {
   validatorCompiler,
   type ZodTypeProvider,
 } from "fastify-type-provider-zod";
+import { AgentHub } from "./agent-hub";
 import type { Config } from "./config";
 import { AppError, rateLimited } from "./errors";
 import { createLogger } from "./logger";
 import { createRateLimiter, type RateLimiter } from "./rate-limit";
 import { createReadiness, type Readiness } from "./readiness";
+import { agentChannelRoutes } from "./routes/agent-channel";
 import { agentRoutes } from "./routes/agents";
 import { auditRoutes } from "./routes/audit";
 import { deviceRoutes } from "./routes/devices";
@@ -31,12 +33,16 @@ export interface Deps {
   resolveTenant: ReturnType<typeof createTenantResolver>;
   limiter: RateLimiter;
   readiness: Readiness;
+  /** Live agent sockets and their request correlation (PRD section 9.2). */
+  hub: AgentHub;
 }
 export interface BuiltApp {
   app: FastifyInstance;
   auth: ReturnType<typeof createAuth>;
   handle: DbHandle;
   readiness: Readiness;
+  /** Exposed so tests (and future live/PTZ routes) can reach connected agents. */
+  hub: AgentHub;
   close(): Promise<void>;
 }
 export type { Role };
@@ -188,6 +194,7 @@ export async function buildApp(opts: {
     vault,
     limiter,
     readiness,
+    hub: new AgentHub(),
     resolveTenant: createTenantResolver(auth, handle.db),
   };
   app.get("/docs/json", { schema: { hide: true } }, async () => app.swagger());
@@ -197,6 +204,7 @@ export async function buildApp(opts: {
   snapshotRoutes(app, deps);
   grantRoutes(app, deps);
   agentRoutes(app, deps);
+  agentChannelRoutes(app, deps);
   auditRoutes(app, deps);
 
   app.withTypeProvider<ZodTypeProvider>();
@@ -205,7 +213,10 @@ export async function buildApp(opts: {
     auth,
     handle,
     readiness,
+    hub: deps.hub,
     async close() {
+      // close agent sockets first so nothing writes to a closing pool
+      deps.hub.closeAll();
       await app.close();
       await handle.close();
     },

@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import {
   AgentEnroll,
   AgentEnrollmentCreate,
@@ -10,7 +11,13 @@ import { agent, agentEnrollment, newId, site, withTenant } from "@pantau/db";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
-import { newAgentToken, newEnrollmentToken, parseEnrollmentToken, sha256 } from "../agent-token";
+import {
+  hashAgentToken,
+  newAgentToken,
+  newEnrollmentToken,
+  parseEnrollmentToken,
+  sha256,
+} from "../agent-token";
 import type { Deps } from "../app";
 import { writeAudit, writeAuditSystem } from "../audit";
 import { AppError, notFound } from "../errors";
@@ -88,7 +95,7 @@ export function agentRoutes(app: FastifyInstance, { handle, resolveTenant }: Dep
       const parsed = parseEnrollmentToken(req.body.token);
       if (!parsed) throw new AppError(401, "invalid_enrollment_token", "Invalid enrollment token");
       const agentId = newId("agt");
-      const agentToken = newAgentToken();
+      const agentToken = newAgentToken(parsed.orgId, agentId);
       const result = await withTenant(handle.db, parsed.orgId, async (tx) => {
         const [enr] = await tx
           .select()
@@ -117,7 +124,11 @@ export function agentRoutes(app: FastifyInstance, { handle, resolveTenant }: Dep
             name: req.body.name,
             version: req.body.version,
             publicKey: req.body.publicKey ?? null,
-            tokenHash: sha256(agentToken),
+            tokenHash: hashAgentToken({
+              orgId: parsed.orgId,
+              agentId,
+              secret: agentToken.split(".")[3] ?? "",
+            }),
             lastSeenAt: new Date(),
             status: "online",
           })
@@ -187,10 +198,17 @@ export function agentRoutes(app: FastifyInstance, { handle, resolveTenant }: Dep
     },
     async (req) => {
       const t = requireAny(req, ["owner", "noc"]);
+      // Revocation overwrites the stored hash with an unguessable value, so the old token can never match
+      // again even if this row is later restored from a backup.
+      const revokedTokenHash = hashAgentToken({
+        orgId: t.orgId,
+        agentId: req.params.id,
+        secret: randomBytes(32).toString("base64url"),
+      });
       const row = await withTenant(handle.db, t.orgId, async (tx) => {
         const [updated] = await tx
           .update(agent)
-          .set({ status: "revoked", tokenHash: sha256(newAgentToken()) })
+          .set({ status: "revoked", tokenHash: revokedTokenHash })
           .where(eq(agent.id, req.params.id))
           .returning();
         if (updated) await writeAudit(tx, t, "agent.revoke", updated.id, {});

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { newAgentToken, newEnrollmentToken, parseEnrollmentToken, sha256 } from "../../src/agent-token";
+import {
+  newAgentToken,
+  newEnrollmentToken,
+  parseAgentToken,
+  parseEnrollmentToken,
+  sha256,
+} from "../../src/agent-token";
 
 describe("agent enrollment tokens", () => {
   it("round-trips org and enrollment ids through the token", () => {
@@ -30,10 +36,11 @@ describe("agent enrollment tokens", () => {
     expect(a.split(".")[3]?.length ?? 0).toBeGreaterThanOrEqual(24);
   });
 
-  it("agent tokens are prefixed and unique", () => {
-    const t = newAgentToken();
+  it("agent tokens carry their org and agent id and stay unique", () => {
+    const t = newAgentToken("org_a", "agt_a");
     expect(t.startsWith("agt.")).toBe(true);
-    expect(newAgentToken()).not.toBe(t);
+    expect(t).not.toBe(newAgentToken("org_a", "agt_a"));
+    expect(parseAgentToken(t)).toMatchObject({ orgId: "org_a", agentId: "agt_a" });
   });
 
   it("sha256 is stable hex and never returns the input", () => {

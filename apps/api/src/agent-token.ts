@@ -28,7 +28,29 @@ export function parseEnrollmentToken(token: string): { orgId: string; enrollment
   return { orgId, enrollmentId };
 }
 
-/** Long-lived agent token handed back once, at enrollment; the server keeps only its hash. */
-export function newAgentToken(): string {
-  return `${AGENT_PREFIX}.${secret(32)}`;
+/**
+ * Long-lived agent token handed back once, at enrollment; the server keeps only its hash.
+ * Like the enrollment token it embeds the org and agent id, so the WebSocket handshake can route to a
+ * tenant and authenticate under RLS without any privileged lookup path.
+ */
+export function newAgentToken(orgId: string, agentId: string): string {
+  return `${AGENT_PREFIX}.${orgId}.${agentId}.${secret(32)}`;
+}
+
+/** The stored form of an agent token. Hashing the assembled string keeps one definition of the layout. */
+export function hashAgentToken(parts: { orgId: string; agentId: string; secret: string }): string {
+  return sha256(`${AGENT_PREFIX}.${parts.orgId}.${parts.agentId}.${parts.secret}`);
+}
+
+export function parseAgentToken(
+  raw: string | undefined,
+): { orgId: string; agentId: string; secret: string } | null {
+  if (!raw) return null;
+  const parts = raw.split(".");
+  if (parts.length !== 4) return null;
+  const [prefix, orgId, agentId, secretPart] = parts as [string, string, string, string];
+  if (prefix !== AGENT_PREFIX) return null;
+  if (!ID_RE.test(orgId) || !ID_RE.test(agentId) || !ID_RE.test(secretPart)) return null;
+  if (secretPart.length < 24) return null;
+  return { orgId, agentId, secret: secretPart };
 }

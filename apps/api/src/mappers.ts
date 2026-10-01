@@ -9,6 +9,7 @@ export function toDevice(r: DeviceRow): z.infer<typeof Device> {
   return {
     id: r.id,
     siteId: r.siteId,
+    agentId: r.agentId,
     name: r.name,
     kind: r.kind as "nvr" | "ipc",
     brand: r.brand,

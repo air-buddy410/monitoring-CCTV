@@ -93,6 +93,8 @@ export const device = pgTable("device", {
   id: text("id").primaryKey(),
   organizationId: text("organization_id").notNull(),
   siteId: text("site_id").notNull(),
+  /** Set when the device was discovered by an agent (PRD section 8); null for manually added devices. */
+  agentId: text("agent_id"),
   name: text("name").notNull(),
   kind: text("kind").notNull(),
   brand: text("brand").notNull().default(""),

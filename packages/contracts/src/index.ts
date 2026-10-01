@@ -1,23 +1,10 @@
 import { z } from "zod";
+import { AdapterId, CapabilityMap } from "./primitives";
 
-/** Capabilities follow PRD section 7. A capability is never claimed unless it was tested. */
-export const CAPABILITIES = [
-  "live",
-  "snapshot",
-  "ptz",
-  "ptz.preset",
-  "events.motion",
-  "playback.search",
-  "playback.stream",
-  "health",
-] as const;
-export type Capability = (typeof CAPABILITIES)[number];
-export const CapabilityState = z.enum(["ya", "tidak", "belum-diuji"]);
-export type CapabilityState = z.infer<typeof CapabilityState>;
-export const CapabilityMap = z.record(z.string(), CapabilityState);
-export type CapabilityMap = Record<Capability, CapabilityState>;
-
-export const AdapterId = z.enum(["onvif-generic", "hikvision-isapi", "dahua-http"]);
+export * from "./agent";
+// Shared vocabulary lives in ./primitives and the agent wire protocol in ./agent; both are re-exported
+// here so callers keep a single import site ("@pantau/contracts").
+export * from "./primitives";
 
 export const ProblemSchema = z.object({
   type: z.string(),
@@ -90,6 +77,8 @@ export type DeviceCreate = z.infer<typeof DeviceCreate>;
 export const Device = z.object({
   id: z.string(),
   siteId: z.string(),
+  /** Null for a device added by hand; set to the discovering agent's id (PRD section 8). */
+  agentId: z.string().nullable(),
   name: z.string(),
   kind: z.enum(["nvr", "ipc"]),
   brand: z.string(),
@@ -222,6 +211,9 @@ export const AUDIT_ACTIONS = [
   "agent.enroll.failed",
   "agent.revoke",
   "agent.inventory.sync",
+  "agent.event.received",
+  "agent.connect",
+  "agent.disconnect",
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 export const AuditActionSchema = z.enum(AUDIT_ACTIONS);
