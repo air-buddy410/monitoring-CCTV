@@ -128,9 +128,15 @@ Skrip antislop-human (`contrast-check.py`) dijalankan untuk 16 pasangan per tema
 
 `.github/workflows/ci.yml`: job `verify` (tidak diubah) dan job baru `e2e` (Node 24, `postgres:17`, install Chromium, build web, `pnpm test:e2e`). Tanpa `continue-on-error`, `permissions: contents: read`.
 
-Hasil run CI untuk PR #2: lihat bagian "CI" di PR dan catatan di bawah (diisi setelah run selesai).
+Hasil untuk commit kode `29d34b1` (diverifikasi dari API GitHub dan log job):
 
-CI_PLACEHOLDER
+- Push: https://github.com/air-buddy410/monitoring-CCTV/actions/runs/36828925359 , job `verify` success (semua langkah) dan job `e2e` success (install Chromium, build web, Browser E2E).
+- Pull request: https://github.com/air-buddy410/monitoring-CCTV/actions/runs/36828929378 , success.
+- Log job `e2e` (PostgreSQL 17.11 resmi, Node 24): `30 passed (41.4s)`.
+- Run untuk commit-commit sebelumnya pada branch yang sama juga success (runs 36826626675, 36827355511, 36828603600, 36828622340).
+- Commit dokumentasi terakhir (hanya berkas Markdown dan catatan) memicu run sendiri; hasilnya tampil di PR #2 dan tidak dikutip di sini.
+
+Catatan: peringatan GitHub tentang action v4 di Node 20 yang dipaksa ke Node 24 masih ada; action belum dipin ke SHA.
 
 ## 10. Audit antislop (Delivery Gate, bukti)
 
