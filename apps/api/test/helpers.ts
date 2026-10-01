@@ -1,0 +1,166 @@
+import { randomUUID } from "node:crypto";
+import { Writable } from "node:stream";
+import { type MockOnvif, type MockOnvifOptions, startMockOnvif } from "@pantau/mock-onvif";
+import pg from "pg";
+import { inject } from "vitest";
+import { type BuiltApp, buildApp } from "../src/app";
+import { loadConfig } from "../src/config";
+
+/** Dummy sentinel; any appearance in responses/logs/DB dumps is a leak. */
+export const DEVICE_PASSWORD = "Dummy-Sentinel-Pw-7391!";
+export const DEVICE_USERNAME = "dummy-admin";
+export const USER_PASSWORD = "Dummy-User-Login-Pw-5521!";
+
+export interface TestEnv {
+  built: BuiltApp;
+  logs: string[];
+  mocks: MockOnvif[];
+  close(): Promise<void>;
+  startMock(opts?: Partial<MockOnvifOptions>): Promise<MockOnvif>;
+  admin: pg.Pool;
+}
+
+export async function createTestEnv(overrides: Record<string, string> = {}): Promise<TestEnv> {
+  const urls = inject("dbUrls");
+  const logs: string[] = [];
+  const logStream = new Writable({
+    write(chunk, _enc, cb) {
+      logs.push(chunk.toString());
+      cb();
+    },
+  });
+  const config = loadConfig({
+    NODE_ENV: "test",
+    DATABASE_URL: urls.app,
+    VAULT_KEY: Buffer.alloc(32, 7).toString("base64"),
+    AUTH_SECRET: "test-secret-test-secret-test-secret-123456",
+    BASE_URL: "http://localhost:3000",
+    ALLOW_LOOPBACK_TARGETS: "true",
+    ONVIF_TIMEOUT_MS: "1500",
+    SNAPSHOT_TIMEOUT_MS: "1500",
+    LOG_LEVEL: "debug",
+    ...overrides,
+  });
+  const built = await buildApp({ config, logStream });
+  await built.app.ready();
+  const admin = new pg.Pool({ connectionString: urls.admin, max: 2 });
+  const mocks: MockOnvif[] = [];
+  return {
+    built,
+    logs,
+    mocks,
+    admin,
+    async startMock(opts = {}) {
+      const m = await startMockOnvif({
+        username: DEVICE_USERNAME,
+        password: DEVICE_PASSWORD,
+        ...opts,
+      });
+      mocks.push(m);
+      return m;
+    },
+    async close() {
+      await built.close();
+      await Promise.all(mocks.map((m) => m.stop()));
+      await admin.end();
+    },
+  };
+}
+
+export interface Tenant {
+  cookie: string;
+  userId: string;
+  orgId: string;
+  email: string;
+}
+
+function cookieFrom(setCookie: string | string[] | undefined): string {
+  const arr = Array.isArray(setCookie) ? setCookie : setCookie ? [setCookie] : [];
+  return arr.map((c) => c.split(";")[0]).join("; ");
+}
+
+/** Sign up through Better Auth, then create an organization (= tenant) and make it active. */
+export async function createTenant(env: TestEnv, label: string): Promise<Tenant> {
+  const { app } = env.built;
+  const email = `${label}-${randomUUID().slice(0, 8)}@example.test`;
+  const signUp = await app.inject({
+    method: "POST",
+    url: "/api/auth/sign-up/email",
+    payload: { email, password: USER_PASSWORD, name: `User ${label}` },
+  });
+  if (signUp.statusCode !== 200) throw new Error(`sign-up failed ${signUp.statusCode}: ${signUp.body}`);
+  const userId = (signUp.json() as { user: { id: string } }).user.id;
+  const cookie = cookieFrom(signUp.headers["set-cookie"]);
+  const org = await app.inject({
+    method: "POST",
+    url: "/api/auth/organization/create",
+    headers: { cookie },
+    payload: { name: `Org ${label}`, slug: `org-${label}-${randomUUID().slice(0, 8)}` },
+  });
+  if (org.statusCode !== 200) throw new Error(`org create failed ${org.statusCode}: ${org.body}`);
+  const orgId = (org.json() as { id: string }).id;
+  const setActive = await app.inject({
+    method: "POST",
+    url: "/api/auth/organization/set-active",
+    headers: { cookie },
+    payload: { organizationId: orgId },
+  });
+  if (setActive.statusCode !== 200) throw new Error(`set-active failed ${setActive.statusCode}`);
+  return { cookie, userId, orgId, email };
+}
+
+/** Add an existing org member with a given role (test-only shortcut via the admin connection). */
+export async function addMemberWithRole(
+  env: TestEnv,
+  org: Tenant,
+  label: string,
+  role: "admin" | "member",
+): Promise<Tenant> {
+  const other = await createTenant(env, label);
+  await env.admin.query(
+    `insert into "member" (id, organization_id, user_id, role, created_at) values ($1,$2,$3,$4, now())`,
+    [randomUUID(), org.orgId, other.userId, role],
+  );
+  const setActive = await env.built.app.inject({
+    method: "POST",
+    url: "/api/auth/organization/set-active",
+    headers: { cookie: other.cookie },
+    payload: { organizationId: org.orgId },
+  });
+  if (setActive.statusCode !== 200) throw new Error(`set-active failed ${setActive.statusCode}`);
+  return { ...other, orgId: org.orgId };
+}
+
+export async function createSite(env: TestEnv, t: Tenant, name = "Site Dummy") {
+  const res = await env.built.app.inject({
+    method: "POST",
+    url: "/v1/sites",
+    headers: { cookie: t.cookie },
+    payload: { name },
+  });
+  if (res.statusCode !== 201) throw new Error(`site create failed ${res.statusCode}: ${res.body}`);
+  return res.json() as { id: string };
+}
+
+export async function addDevice(
+  env: TestEnv,
+  t: Tenant,
+  siteId: string,
+  mock: MockOnvif,
+  extra: Record<string, unknown> = {},
+) {
+  return env.built.app.inject({
+    method: "POST",
+    url: "/v1/devices",
+    headers: { cookie: t.cookie },
+    payload: {
+      siteId,
+      name: "Mock Device",
+      host: mock.host,
+      port: mock.port,
+      username: DEVICE_USERNAME,
+      password: DEVICE_PASSWORD,
+      ...extra,
+    },
+  });
+}

@@ -1,0 +1,31 @@
+{
+  "name": "pantau",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "typecheck": "pnpm -r --workspace-concurrency=1 typecheck",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "test": "pnpm test:unit && pnpm test:integration",
+    "build": "pnpm -r --workspace-concurrency=1 build",
+    "db:setup": "bash scripts/setup-local-db.sh",
+    "db:migrate": "pnpm --filter @pantau/db migrate",
+    "openapi:export": "pnpm --filter @pantau/api openapi:export",
+    "dev:mock": "pnpm --filter @pantau/mock-onvif start",
+    "dev:api": "pnpm --filter @pantau/api dev",
+    "start": "pnpm --filter @pantau/api start",
+    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0",
+    "tsx": "^4.20.0",
+    "@types/node": "^22.0.0"
+  }
+}
