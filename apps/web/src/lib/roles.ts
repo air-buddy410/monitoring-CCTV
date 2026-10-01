@@ -11,4 +11,8 @@ export const can = {
   audit: (r: Role | null) => r === "owner",
 };
 
-export const ROLE_LABEL: Record<Role, string> = { owner: "Pemilik", operator: "Operator", viewer: "Penonton" };
+export const ROLE_LABEL: Record<Role, string> = {
+  owner: "Pemilik",
+  operator: "Operator",
+  viewer: "Penonton",
+};

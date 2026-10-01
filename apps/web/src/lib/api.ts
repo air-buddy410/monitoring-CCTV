@@ -29,7 +29,8 @@ async function toError(res: Response): Promise<ApiError> {
   try {
     const body: unknown = await res.json();
     const problem = ProblemSchema.safeParse(body);
-    if (problem.success) return new ApiError(res.status, problem.data.code, retryAfterSec, problem.data.detail);
+    if (problem.success)
+      return new ApiError(res.status, problem.data.code, retryAfterSec, problem.data.detail);
     // Better Auth answers with { code, message } instead of problem+json.
     const loose = body as { code?: unknown };
     if (typeof loose?.code === "string") return new ApiError(res.status, loose.code, retryAfterSec);
@@ -70,7 +71,11 @@ export async function getJson<S extends z.ZodType>(path: string, schema: S): Pro
   return parsed.data;
 }
 
-export async function postJson<S extends z.ZodType>(path: string, body: unknown, schema: S): Promise<z.infer<S>> {
+export async function postJson<S extends z.ZodType>(
+  path: string,
+  body: unknown,
+  schema: S,
+): Promise<z.infer<S>> {
   const res = await send(path, { method: "POST", json: body });
   const parsed = schema.safeParse(await res.json());
   if (!parsed.success) throw new ApiError(res.status, "contract_mismatch");

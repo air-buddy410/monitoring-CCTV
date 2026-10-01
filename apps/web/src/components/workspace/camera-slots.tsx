@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { formatClock } from "@/lib/format";
-import type { ShotState } from "./snapshot-stage";
 import type { CameraT } from "./data";
+import type { ShotState } from "./snapshot-stage";
 
 interface Props {
   deviceId: string;
@@ -33,7 +33,6 @@ export function CameraSlots({ deviceId, cameras, selectedId, shots }: Props) {
               >
                 <span className="flex aspect-video items-center justify-center overflow-hidden bg-[var(--viewer-bg)]">
                   {s?.status === "ready" ? (
-                    // biome-ignore lint/performance/noImgElement: blob URL thumbnail
                     <img src={s.frame.url} alt="" className="h-full w-full object-cover" />
                   ) : (
                     <span className="mono px-2 text-center text-[var(--viewer-text)]">Belum diambil</span>

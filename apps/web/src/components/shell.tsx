@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useState } from "react";
-import { ROLE_LABEL, can } from "@/lib/roles";
+import { can, ROLE_LABEL } from "@/lib/roles";
 import { SessionGate, useSession } from "./session";
 import { ThemeToggle } from "./theme-toggle";
 import { Dialog } from "./ui";

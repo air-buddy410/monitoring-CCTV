@@ -34,7 +34,8 @@ function LoginForm() {
     setBusy(true);
     try {
       if (mode === "masuk") await postJson("/api/auth/sign-in/email", { email, password }, AnyJson);
-      else await postJson("/api/auth/sign-up/email", { email, password, name: name.trim() || email }, AnyJson);
+      else
+        await postJson("/api/auth/sign-up/email", { email, password, name: name.trim() || email }, AnyJson);
       router.replace(safeNext(params.get("next")));
     } catch (err) {
       setError(describeError(err));
@@ -63,7 +64,8 @@ function LoginForm() {
           <p className="mono mt-4 text-muted">Diisi dari perangkat saat probe. Tidak ada angka contoh.</p>
         </div>
         <p className="max-w-md text-muted">
-          PANTAU membaca merek, model, firmware, dan kemampuan perangkat lewat ONVIF, lalu mengambil snapshot dari kameranya.
+          PANTAU membaca merek, model, firmware, dan kemampuan perangkat lewat ONVIF, lalu mengambil snapshot
+          dari kameranya.
         </p>
       </section>
       <section className="flex flex-col justify-center p-4 min-[900px]:p-10">
@@ -72,7 +74,11 @@ function LoginForm() {
           <h1 className="h-page">{mode === "masuk" ? "Masuk" : "Buat akun"}</h1>
           {expired ? (
             <div className="mt-4">
-              <StateBlock kind="expired" title="Sesi Anda berakhir." hint="Masuk lagi untuk melanjutkan di halaman tadi." />
+              <StateBlock
+                kind="expired"
+                title="Sesi Anda berakhir."
+                hint="Masuk lagi untuk melanjutkan di halaman tadi."
+              />
             </div>
           ) : null}
           {error ? (
@@ -86,7 +92,13 @@ function LoginForm() {
                 <label className="label" htmlFor="nama">
                   Nama
                 </label>
-                <input id="nama" className="field" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />
+                <input
+                  id="nama"
+                  className="field"
+                  autoComplete="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
               </div>
             ) : null}
             <div>

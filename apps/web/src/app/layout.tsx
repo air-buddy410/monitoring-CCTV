@@ -26,7 +26,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         {demo ? (
           <div role="note" className="bg-accent px-3 py-2 text-on-accent">
-            <strong>Mode Simulasi.</strong> Perangkat dan gambar di sini berasal dari mock ONVIF lokal, bukan dari CCTV nyata.
+            <strong>Mode Simulasi.</strong> Perangkat dan gambar di sini berasal dari mock ONVIF lokal, bukan
+            dari CCTV nyata.
           </div>
         ) : null}
         {children}

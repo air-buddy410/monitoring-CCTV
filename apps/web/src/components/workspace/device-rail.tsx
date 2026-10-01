@@ -15,7 +15,12 @@ function FilterControls({ f, set, sites }: { f: Filters; set: (n: Filters) => vo
         <label className="label" htmlFor="f-lokasi">
           Lokasi
         </label>
-        <select id="f-lokasi" className="field" value={f.siteId} onChange={(e) => set({ ...f, siteId: e.target.value })}>
+        <select
+          id="f-lokasi"
+          className="field"
+          value={f.siteId}
+          onChange={(e) => set({ ...f, siteId: e.target.value })}
+        >
           <option value="">Semua lokasi</option>
           {sites.map((s) => (
             <option key={s.id} value={s.id}>
@@ -24,30 +29,37 @@ function FilterControls({ f, set, sites }: { f: Filters; set: (n: Filters) => vo
           ))}
         </select>
       </div>
-      <div>
-        <label className="label" htmlFor="f-jenis">
-          Jenis
-        </label>
-        <select
-          id="f-jenis"
-          className="field"
-          value={f.kind}
-          onChange={(e) => set({ ...f, kind: e.target.value as Filters["kind"] })}
-        >
-          <option value="">Semua jenis</option>
-          <option value="nvr">NVR (lebih dari satu kanal)</option>
-          <option value="ipc">Kamera tunggal</option>
-        </select>
-      </div>
-      <div>
-        <label className="label" htmlFor="f-cap">
-          Kemampuan
-        </label>
-        <select id="f-cap" className="field" value={f.cap} onChange={(e) => set({ ...f, cap: e.target.value as Filters["cap"] })}>
-          <option value="">Semua kemampuan</option>
-          <option value="snapshot">Snapshot terbukti saat probe</option>
-          <option value="ptz">PTZ terdeteksi</option>
-        </select>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="label" htmlFor="f-jenis">
+            Jenis
+          </label>
+          <select
+            id="f-jenis"
+            className="field"
+            value={f.kind}
+            onChange={(e) => set({ ...f, kind: e.target.value as Filters["kind"] })}
+          >
+            <option value="">Semua</option>
+            <option value="nvr">NVR</option>
+            <option value="ipc">Kamera tunggal</option>
+          </select>
+        </div>
+        <div>
+          <label className="label" htmlFor="f-cap">
+            Kemampuan
+          </label>
+          <select
+            id="f-cap"
+            className="field"
+            value={f.cap}
+            onChange={(e) => set({ ...f, cap: e.target.value as Filters["cap"] })}
+          >
+            <option value="">Semua</option>
+            <option value="snapshot">Snapshot terbukti</option>
+            <option value="ptz">PTZ terdeteksi</option>
+          </select>
+        </div>
       </div>
     </div>
   );
@@ -77,7 +89,10 @@ export function DeviceRail({ devices, cameras, sites, role, selectedId, onAdd, h
   const activeCount = [f.siteId, f.kind, f.cap].filter(Boolean).length;
 
   return (
-    <section aria-labelledby="rail-title" className={`${hiddenOnNarrow ? "hidden min-[720px]:block" : ""} min-w-0`}>
+    <section
+      aria-labelledby="rail-title"
+      className={`${hiddenOnNarrow ? "hidden min-[720px]:block" : ""} min-w-0`}
+    >
       <div className="flex items-center justify-between gap-2">
         <h2 id="rail-title" className="h-section">
           Perangkat
@@ -132,7 +147,9 @@ export function DeviceRail({ devices, cameras, sites, role, selectedId, onAdd, h
             </>
           )}
           <p className="text-muted" aria-live="polite">
-            {isFiltering(f) ? `${shown.length} dari ${devices.length} perangkat cocok.` : `${devices.length} perangkat.`}
+            {isFiltering(f)
+              ? `${shown.length} dari ${devices.length} perangkat cocok.`
+              : `${devices.length} perangkat.`}
           </p>
         </div>
       ) : null}
@@ -180,7 +197,15 @@ export function DeviceRail({ devices, cameras, sites, role, selectedId, onAdd, h
                   >
                     <span className="block font-bold">{d.name}</span>
                     <span className="block text-muted">
-                      {[d.brand, d.model].filter(Boolean).join(" ") || "Merek tidak dilaporkan"}
+                      {d.brand || d.model ? (
+                        <>
+                          <span className="capitalize">{d.brand}</span>
+                          {d.brand && d.model ? " " : ""}
+                          {d.model}
+                        </>
+                      ) : (
+                        "Merek tidak dilaporkan"
+                      )}
                     </span>
                     <span className="mono block text-muted">
                       {d.host}:{d.port}

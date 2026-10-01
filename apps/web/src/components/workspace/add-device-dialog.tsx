@@ -3,8 +3,7 @@
 import { DeviceWithCameras, Site } from "@pantau/contracts";
 import { type FormEvent, useState } from "react";
 import { Dialog, StateBlock } from "@/components/ui";
-import { postJson } from "@/lib/api";
-import { ApiError } from "@/lib/api";
+import { ApiError, postJson } from "@/lib/api";
 import { describeError, type Message } from "@/lib/errors";
 import { type DeviceFormValues, type FieldErrors, NEW_SITE, validateDeviceForm } from "@/lib/validate";
 import type { SiteT } from "./data";
@@ -52,7 +51,8 @@ export function AddDeviceDialog({ open, onClose, sites, onCreated }: Props) {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [failure, setFailure] = useState<Message | null>(null);
   const [busy, setBusy] = useState(false);
-  const set = <K extends keyof DeviceFormValues>(k: K, val: DeviceFormValues[K]) => setV((p) => ({ ...p, [k]: val }));
+  const set = <K extends keyof DeviceFormValues>(k: K, val: DeviceFormValues[K]) =>
+    setV((p) => ({ ...p, [k]: val }));
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -75,7 +75,14 @@ export function AddDeviceDialog({ open, onClose, sites, onCreated }: Props) {
       }
       const created = await postJson(
         "/v1/devices",
-        { siteId, name: v.name.trim(), host: v.host.trim(), port: Number(v.port), username: v.username, password: v.password },
+        {
+          siteId,
+          name: v.name.trim(),
+          host: v.host.trim(),
+          port: Number(v.port),
+          username: v.username,
+          password: v.password,
+        },
         DeviceWithCameras,
       );
       onCreated(created.device.id);
@@ -114,7 +121,16 @@ export function AddDeviceDialog({ open, onClose, sites, onCreated }: Props) {
                   type="button"
                   key={p.port}
                   className="btn"
-                  onClick={() => setV((x) => ({ ...x, name: p.label, host: "127.0.0.1", port: String(p.port), username: "dummy-admin", password: "dummy-password" }))}
+                  onClick={() =>
+                    setV((x) => ({
+                      ...x,
+                      name: p.label,
+                      host: "127.0.0.1",
+                      port: String(p.port),
+                      username: "dummy-admin",
+                      password: "dummy-password",
+                    }))
+                  }
                 >
                   {p.label}
                 </button>
@@ -131,7 +147,12 @@ export function AddDeviceDialog({ open, onClose, sites, onCreated }: Props) {
           <label className="label" htmlFor="dev-siteId">
             Lokasi
           </label>
-          <select {...field("siteId")} className="field" value={v.siteId} onChange={(e) => set("siteId", e.target.value)}>
+          <select
+            {...field("siteId")}
+            className="field"
+            value={v.siteId}
+            onChange={(e) => set("siteId", e.target.value)}
+          >
             {sites.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
@@ -146,7 +167,12 @@ export function AddDeviceDialog({ open, onClose, sites, onCreated }: Props) {
             <label className="label" htmlFor="dev-newSiteName">
               Nama lokasi baru
             </label>
-            <input {...field("newSiteName")} className="field" value={v.newSiteName} onChange={(e) => set("newSiteName", e.target.value)} />
+            <input
+              {...field("newSiteName")}
+              className="field"
+              value={v.newSiteName}
+              onChange={(e) => set("newSiteName", e.target.value)}
+            />
             {err("newSiteName")}
           </div>
         ) : null}
@@ -154,7 +180,12 @@ export function AddDeviceDialog({ open, onClose, sites, onCreated }: Props) {
           <label className="label" htmlFor="dev-name">
             Nama perangkat
           </label>
-          <input {...field("name")} className="field" value={v.name} onChange={(e) => set("name", e.target.value)} />
+          <input
+            {...field("name")}
+            className="field"
+            value={v.name}
+            onChange={(e) => set("name", e.target.value)}
+          />
           {err("name")}
         </div>
         <div className="grid grid-cols-[1fr_7rem] gap-3">
@@ -177,7 +208,13 @@ export function AddDeviceDialog({ open, onClose, sites, onCreated }: Props) {
             <label className="label" htmlFor="dev-port">
               Port
             </label>
-            <input {...field("port")} className="field mono" inputMode="numeric" value={v.port} onChange={(e) => set("port", e.target.value)} />
+            <input
+              {...field("port")}
+              className="field mono"
+              inputMode="numeric"
+              value={v.port}
+              onChange={(e) => set("port", e.target.value)}
+            />
             {err("port")}
           </div>
         </div>
@@ -186,7 +223,13 @@ export function AddDeviceDialog({ open, onClose, sites, onCreated }: Props) {
             <label className="label" htmlFor="dev-username">
               Nama pengguna perangkat
             </label>
-            <input {...field("username")} className="field" autoComplete="off" value={v.username} onChange={(e) => set("username", e.target.value)} />
+            <input
+              {...field("username")}
+              className="field"
+              autoComplete="off"
+              value={v.username}
+              onChange={(e) => set("username", e.target.value)}
+            />
             {err("username")}
           </div>
           <div>
@@ -205,7 +248,8 @@ export function AddDeviceDialog({ open, onClose, sites, onCreated }: Props) {
           </div>
         </div>
         <p className="help">
-          Kredensial dipakai untuk probe ONVIF dan disimpan terenkripsi di server. Kredensial tidak ditampilkan lagi setelah ini.
+          Kredensial dipakai untuk probe ONVIF dan disimpan terenkripsi di server. Kredensial tidak
+          ditampilkan lagi setelah ini.
         </p>
         <div className="flex flex-wrap gap-2">
           <button type="submit" className="btn btn-primary" disabled={busy} aria-busy={busy}>

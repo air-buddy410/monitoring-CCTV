@@ -8,7 +8,7 @@ import { AppFrame } from "@/components/shell";
 import { StateBlock } from "@/components/ui";
 import { ApiError, getJson } from "@/lib/api";
 import { describeError } from "@/lib/errors";
-import { AUDIT_LABEL, REASON_LABEL, formatDateTime } from "@/lib/format";
+import { AUDIT_LABEL, formatDateTime, REASON_LABEL } from "@/lib/format";
 import { can } from "@/lib/roles";
 
 type Item = z.infer<typeof AuditList>["items"][number];
@@ -24,7 +24,9 @@ const FACTS: [string, string][] = [
 ];
 
 function detail(meta: Record<string, unknown>): string {
-  const parts = FACTS.filter(([k]) => meta[k] !== undefined && meta[k] !== "").map(([k, label]) => `${label} ${String(meta[k])}`);
+  const parts = FACTS.filter(([k]) => meta[k] !== undefined && meta[k] !== "").map(
+    ([k, label]) => `${label} ${String(meta[k])}`,
+  );
   if (typeof meta.reason === "string") parts.push(`sebab: ${REASON_LABEL[meta.reason] ?? meta.reason}`);
   return parts.join(" · ");
 }
@@ -49,7 +51,10 @@ function AuditView() {
   return (
     <div className="mx-auto max-w-5xl">
       <h1 className="h-page">Audit</h1>
-      <p className="mt-1 text-muted">Catatan penambahan perangkat dan pengambilan snapshot di organisasi ini. Hanya pemilik yang dapat membacanya.</p>
+      <p className="mt-1 text-muted">
+        Catatan penambahan perangkat dan pengambilan snapshot di organisasi ini. Hanya pemilik yang dapat
+        membacanya.
+      </p>
       {!can.audit(role) && state.status !== "error" ? (
         <p className="mt-2 text-muted">Peran Anda bukan pemilik; server akan menolak permintaan ini.</p>
       ) : null}
@@ -86,11 +91,18 @@ function AuditView() {
             );
           })()
         ) : state.items.length === 0 ? (
-          <StateBlock kind="empty" title="Belum ada catatan audit." hint="Catatan muncul setelah perangkat ditambahkan atau snapshot diambil." />
+          <StateBlock
+            kind="empty"
+            title="Belum ada catatan audit."
+            hint="Catatan muncul setelah perangkat ditambahkan atau snapshot diambil."
+          />
         ) : (
           <ol className="border-t border-hair">
             {state.items.map((i) => (
-              <li key={i.id} className="grid gap-x-4 gap-y-1 border-b border-hair py-3 min-[900px]:grid-cols-[13rem_14rem_1fr]">
+              <li
+                key={i.id}
+                className="grid gap-x-4 gap-y-1 border-b border-hair py-3 min-[900px]:grid-cols-[13rem_14rem_1fr]"
+              >
                 <time dateTime={i.at} className="mono">
                   {formatDateTime(i.at)}
                 </time>

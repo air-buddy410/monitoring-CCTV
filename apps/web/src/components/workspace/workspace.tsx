@@ -46,7 +46,10 @@ export function Workspace() {
         return { ...p, [cameraId]: { status: "ready", frame } };
       });
     } catch (error) {
-      const retryUntil = error instanceof ApiError && error.status === 429 && error.retryAfterSec ? Date.now() + error.retryAfterSec * 1000 : undefined;
+      const retryUntil =
+        error instanceof ApiError && error.status === 429 && error.retryAfterSec
+          ? Date.now() + error.retryAfterSec * 1000
+          : undefined;
       setShots((p) => {
         const old = p[cameraId];
         if (old?.status === "ready") {
@@ -64,7 +67,13 @@ export function Workspace() {
     if (!device) return { missing: true as const };
     const cameras = data.cameras.filter((c) => c.deviceId === device.id);
     const camera = cameras.find((c) => c.id === cameraParam) ?? cameras[0];
-    return { missing: false as const, device, cameras, camera, site: data.sites.find((s) => s.id === device.siteId) };
+    return {
+      missing: false as const,
+      device,
+      cameras,
+      camera,
+      site: data.sites.find((s) => s.id === device.siteId),
+    };
   }, [data, deviceId, cameraParam]);
 
   if (data.status === "loading")
@@ -110,7 +119,9 @@ export function Workspace() {
           />
         </div>
 
-        <div className={`min-w-0 min-[720px]:col-start-2 min-[720px]:row-start-1 ${selected ? "" : "max-[719px]:hidden"}`}>
+        <div
+          className={`min-w-0 min-[720px]:col-start-2 min-[720px]:row-start-1 ${selected ? "" : "max-[719px]:hidden"}`}
+        >
           {!selected ? (
             <StateBlock
               kind="empty"
@@ -136,10 +147,19 @@ export function Workspace() {
                 shot={shots[view.camera.id] ?? { status: "idle" }}
                 onTake={() => void take((view.camera as { id: string }).id)}
               />
-              <CameraSlots deviceId={view.device.id} cameras={view.cameras} selectedId={view.camera.id} shots={shots} />
+              <CameraSlots
+                deviceId={view.device.id}
+                cameras={view.cameras}
+                selectedId={view.camera.id}
+                shots={shots}
+              />
             </>
           ) : view ? (
-            <StateBlock kind="empty" title="Perangkat ini belum punya kamera." hint="Probe tidak menemukan kanal video." />
+            <StateBlock
+              kind="empty"
+              title="Perangkat ini belum punya kamera."
+              hint="Probe tidak menemukan kanal video."
+            />
           ) : null}
         </div>
 

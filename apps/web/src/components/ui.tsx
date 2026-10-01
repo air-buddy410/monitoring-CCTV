@@ -40,7 +40,11 @@ export function Dialog({ open, onClose, title, children, className, bare }: Dial
     <dialog ref={ref} aria-labelledby={titleId} onClose={onClose} className={className}>
       {open && (
         <div className={bare ? "" : "flex max-h-[inherit] flex-col"}>
-          <div className={bare ? "sr-only" : "flex items-center justify-between gap-3 border-b border-hair px-4 py-2"}>
+          <div
+            className={
+              bare ? "sr-only" : "flex items-center justify-between gap-3 border-b border-hair px-4 py-2"
+            }
+          >
             <h2 id={titleId} className="h-section">
               {title}
             </h2>

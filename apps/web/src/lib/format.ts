@@ -1,7 +1,8 @@
 const dateTime = new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "medium" });
 const clock = new Intl.DateTimeFormat("id-ID", { timeStyle: "medium" });
 
-export const formatDateTime = (iso: string | Date) => dateTime.format(typeof iso === "string" ? new Date(iso) : iso);
+export const formatDateTime = (iso: string | Date) =>
+  dateTime.format(typeof iso === "string" ? new Date(iso) : iso);
 export const formatClock = (d: Date) => clock.format(d);
 
 export function formatBytes(n: number): string {

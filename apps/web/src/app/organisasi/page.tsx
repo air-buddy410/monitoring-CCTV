@@ -3,8 +3,8 @@
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { z } from "zod";
-import { AppFrame } from "@/components/shell";
 import { useSession } from "@/components/session";
+import { AppFrame } from "@/components/shell";
 import { StateBlock } from "@/components/ui";
 import { postJson, postVoid } from "@/lib/api";
 import { describeError } from "@/lib/errors";
@@ -49,7 +49,11 @@ function OrgPicker() {
     setError(null);
     try {
       const slug = `${base}-${Math.random().toString(36).slice(2, 6)}`;
-      const created = await postJson("/api/auth/organization/create", { name: name.trim(), slug }, OrgCreated);
+      const created = await postJson(
+        "/api/auth/organization/create",
+        { name: name.trim(), slug },
+        OrgCreated,
+      );
       await choose(created.id);
     } catch (err) {
       setError(describeError(err));
@@ -63,7 +67,9 @@ function OrgPicker() {
         <h1 id="pilih" className="h-page">
           Pilih organisasi
         </h1>
-        <p className="mt-1 text-muted">Data perangkat dipisahkan per organisasi. Anda hanya melihat data organisasi yang aktif.</p>
+        <p className="mt-1 text-muted">
+          Data perangkat dipisahkan per organisasi. Anda hanya melihat data organisasi yang aktif.
+        </p>
         {error ? (
           <div className="mt-4">
             <StateBlock kind="error" title={error.title} hint={error.hint} />
@@ -80,7 +86,10 @@ function OrgPicker() {
         ) : (
           <ul className="mt-4 space-y-2">
             {orgs.map((o) => (
-              <li key={o.id} className="flex flex-wrap items-center justify-between gap-2 border border-hair bg-panel p-3">
+              <li
+                key={o.id}
+                className="flex flex-wrap items-center justify-between gap-2 border border-hair bg-panel p-3"
+              >
                 <span>
                   <strong>{o.name}</strong>
                   {o.id === org.id ? <span className="ml-2 text-accent-ink">(aktif)</span> : null}

@@ -42,7 +42,12 @@ export function SnapshotStage({ camera, role, shot, onTake }: Props) {
   const allowed = can.snapshot(role);
   const busy = shot.status === "loading";
   const showFrame = shot.status === "ready" && !broken;
-  const message: Message | null = shot.status === "error" ? describeError(shot.error) : broken ? { title: "Gambar tidak dapat ditampilkan." } : null;
+  const message: Message | null =
+    shot.status === "error"
+      ? describeError(shot.error)
+      : broken
+        ? { title: "Gambar tidak dapat ditampilkan." }
+        : null;
   const shotLabel = shot.status === "ready" ? "Ambil snapshot lagi" : "Ambil snapshot";
   const fileName =
     shot.status === "ready"
@@ -57,7 +62,6 @@ export function SnapshotStage({ camera, role, shot, onTake }: Props) {
       <figure className="crop m-0 mx-2 mt-4" data-active={showFrame ? "true" : "false"}>
         <div className="relative flex aspect-video w-full items-center justify-center overflow-hidden bg-[var(--viewer-bg)] text-[var(--viewer-text)]">
           {showFrame && shot.status === "ready" ? (
-            // biome-ignore lint/performance/noImgElement: blob URL from the API, not a static asset
             <img
               src={shot.frame.url}
               alt={`Snapshot kamera ${camera.name}, diterima pukul ${formatClock(shot.frame.receivedAt)}`}
@@ -67,7 +71,11 @@ export function SnapshotStage({ camera, role, shot, onTake }: Props) {
           ) : (
             <div className="w-full p-4">
               {busy ? (
-                <StateBlock kind="loading" title="Meminta snapshot dari perangkat…" hint="Biasanya selesai dalam beberapa detik. Batas waktunya diatur server." />
+                <StateBlock
+                  kind="loading"
+                  title="Meminta snapshot dari perangkat…"
+                  hint="Biasanya selesai dalam beberapa detik. Batas waktunya diatur server."
+                />
               ) : message ? (
                 <StateBlock
                   kind={message.title.startsWith("Peran") ? "forbidden" : "error"}
@@ -90,7 +98,8 @@ export function SnapshotStage({ camera, role, shot, onTake }: Props) {
         </div>
         <figcaption className="mono flex flex-wrap justify-between gap-x-4 border border-t-0 border-line bg-raised px-3 py-2 text-ink">
           <span>
-            Kanal {camera.channel} · utama {camera.mainCodec ?? "tidak dilaporkan"} · sub {camera.subCodec ?? "tidak dilaporkan"}
+            Kanal {camera.channel} · utama {camera.mainCodec ?? "tidak dilaporkan"} · sub{" "}
+            {camera.subCodec ?? "tidak dilaporkan"}
           </span>
           <span>
             {showFrame && shot.status === "ready"
@@ -106,7 +115,13 @@ export function SnapshotStage({ camera, role, shot, onTake }: Props) {
         aria-label="Aksi snapshot"
       >
         {allowed ? (
-          <button type="button" className="btn btn-primary" onClick={onTake} disabled={busy || retryIn > 0} aria-busy={busy}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={onTake}
+            disabled={busy || retryIn > 0}
+            aria-busy={busy}
+          >
             <GlyphRepeat />
             {busy ? "Mengambil…" : retryIn > 0 ? `${shotLabel} (tunggu ${retryIn} dtk)` : shotLabel}
           </button>
@@ -123,7 +138,13 @@ export function SnapshotStage({ camera, role, shot, onTake }: Props) {
         ) : null}
       </div>
 
-      <Dialog open={full} onClose={() => setFull(false)} title={`Snapshot ${camera.name}`} bare className="viewer">
+      <Dialog
+        open={full}
+        onClose={() => setFull(false)}
+        title={`Snapshot ${camera.name}`}
+        bare
+        className="viewer"
+      >
         <div className="flex h-dvh flex-col">
           <div className="flex items-center justify-between gap-3 p-3">
             <p className="mono">
@@ -136,8 +157,11 @@ export function SnapshotStage({ camera, role, shot, onTake }: Props) {
           </div>
           <div className="min-h-0 flex-1 p-3 pt-0">
             {shot.status === "ready" ? (
-              // biome-ignore lint/performance/noImgElement: blob URL from the API
-              <img src={shot.frame.url} alt={`Snapshot kamera ${camera.name}`} className="h-full w-full object-contain" />
+              <img
+                src={shot.frame.url}
+                alt={`Snapshot kamera ${camera.name}`}
+                className="h-full w-full object-contain"
+              />
             ) : null}
           </div>
         </div>

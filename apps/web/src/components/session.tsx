@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { type ReactNode, createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from "react";
 import { z } from "zod";
 import { ApiError, getJson, postVoid } from "@/lib/api";
 import { type Role, toRole } from "@/lib/roles";
@@ -13,7 +13,9 @@ const SessionSchema = z
     user: z.object({ id: z.string(), name: z.string(), email: z.string() }).passthrough(),
   })
   .nullable();
-const OrgsSchema = z.array(z.object({ id: z.string(), name: z.string(), slug: z.string().nullish() }).passthrough());
+const OrgsSchema = z.array(
+  z.object({ id: z.string(), name: z.string(), slug: z.string().nullish() }).passthrough(),
+);
 const RoleSchema = z.object({ role: z.string() }).passthrough();
 
 export interface Org {
@@ -56,7 +58,10 @@ export function SessionGate({ children, needOrg = true }: { children: ReactNode;
       try {
         const s = await getJson("/api/auth/get-session", SessionSchema);
         if (!s) return router.replace(`/login?next=${encodeURIComponent(path)}`);
-        const orgs = (await getJson("/api/auth/organization/list", OrgsSchema)).map((o) => ({ id: o.id, name: o.name }));
+        const orgs = (await getJson("/api/auth/organization/list", OrgsSchema)).map((o) => ({
+          id: o.id,
+          name: o.name,
+        }));
         const activeId = s.session.activeOrganizationId ?? null;
         const org = orgs.find((o) => o.id === activeId);
         if (!org) {

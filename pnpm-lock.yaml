@@ -115,18 +115,27 @@ importers:
         specifier: ^4.1.0
         version: 4.6.5
     devDependencies:
+      '@pantau/mock-onvif':
+        specifier: workspace:*
+        version: link:../../packages/mock-onvif
       '@playwright/test':
         specifier: 1.56.1
         version: 1.56.1
       '@tailwindcss/postcss':
         specifier: ^4.1.0
         version: 4.3.3
+      '@types/pg':
+        specifier: ^8.11.0
+        version: 8.23.1
       '@types/react':
         specifier: ^19.2.0
         version: 19.3.0
       '@types/react-dom':
         specifier: ^19.2.0
         version: 19.3.0(@types/react@19.3.0)
+      pg:
+        specifier: ^8.13.0
+        version: 8.23.1
       tailwindcss:
         specifier: ^4.1.0
         version: 4.3.3
