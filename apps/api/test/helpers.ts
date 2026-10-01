@@ -20,6 +20,8 @@ export interface TestEnv {
   close(): Promise<void>;
   startMock(opts?: Partial<MockOnvifOptions>): Promise<MockOnvif>;
   admin: pg.Pool;
+  /** The AUTH_SECRET the app was built with (used by tests that must decrypt 2FA material). */
+  authSecret: string;
 }
 
 export async function createTestEnv(overrides: Record<string, string> = {}): Promise<TestEnv> {
@@ -31,11 +33,12 @@ export async function createTestEnv(overrides: Record<string, string> = {}): Pro
       cb();
     },
   });
+  const authSecret = "test-secret-test-secret-test-secret-123456";
   const config = loadConfig({
     NODE_ENV: "test",
     DATABASE_URL: urls.app,
     VAULT_KEY: Buffer.alloc(32, 7).toString("base64"),
-    AUTH_SECRET: "test-secret-test-secret-test-secret-123456",
+    AUTH_SECRET: authSecret,
     BASE_URL: "http://localhost:3000",
     ALLOW_LOOPBACK_TARGETS: "true",
     ONVIF_TIMEOUT_MS: "1500",
@@ -56,6 +59,7 @@ export async function createTestEnv(overrides: Record<string, string> = {}): Pro
     logs,
     mocks,
     admin,
+    authSecret,
     async startMock(opts = {}) {
       const m = await startMockOnvif({
         username: DEVICE_USERNAME,
