@@ -85,12 +85,15 @@ test("pemilik membuat token pendaftaran di UI, agen sungguhan mendaftar denganny
     password: DEVICE_PASSWORD,
   });
 
-  await page.reload();
   const card = page.getByRole("article", { name: "Agen UI" });
-  await expect(card).toBeVisible();
+  // The page does not refresh itself, and the status that counts both cameras may arrive after the first load.
+  await expect(async () => {
+    await page.reload();
+    await expect(card).toBeVisible({ timeout: 3000 });
+    await expect(card.getByText(/Kamera terjangkau 2 dari 2/)).toBeVisible({ timeout: 1500 });
+  }).toPass({ timeout: 20_000 });
   await expect(card.getByText("Terhubung", { exact: true })).toBeVisible();
   await expect(card.getByText("Lokasi Uji")).toBeVisible();
-  await expect(card.getByText(/Kamera terjangkau 2 dari 2/)).toBeVisible({ timeout: 10_000 });
   await expect(card.getByText(/Laporan terakhir pukul/)).toBeVisible();
 
   // the metadata the agent synced is in the normal device list, with no credentials anywhere
