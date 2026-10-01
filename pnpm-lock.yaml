@@ -30,6 +30,37 @@ importers:
         specifier: ^3.2.0
         version: 3.2.7(@types/node@22.20.4)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.15)(yaml@2.9.1)
 
+  apps/agent:
+    dependencies:
+      '@pantau/adapters':
+        specifier: workspace:*
+        version: link:../../packages/adapters
+      '@pantau/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      onvif:
+        specifier: 1.0.0-rc.3
+        version: 1.0.0-rc.3
+      pino:
+        specifier: ^10.3.1
+        version: 10.3.1
+      undici:
+        specifier: ^7.30.0
+        version: 7.30.0
+      ws:
+        specifier: ^8.22.0
+        version: 8.22.0
+      zod:
+        specifier: ^4.1.0
+        version: 4.6.5
+    devDependencies:
+      '@types/ws':
+        specifier: ^8.18.2
+        version: 8.18.2
+      tsup:
+        specifier: ^8.5.0
+        version: 8.5.1(jiti@2.7.0)(postcss@8.5.28)(tsx@4.23.15)(typescript@5.9.3)(yaml@2.9.1)
+
   apps/api:
     dependencies:
       '@fastify/swagger':
@@ -87,6 +118,9 @@ importers:
         specifier: ^4.1.0
         version: 4.6.5
     devDependencies:
+      '@pantau/agent':
+        specifier: workspace:*
+        version: link:../agent
       '@pantau/mock-onvif':
         specifier: workspace:*
         version: link:../../packages/mock-onvif

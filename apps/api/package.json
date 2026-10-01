@@ -34,6 +34,7 @@
     "@pantau/mock-onvif": "workspace:*",
     "@types/pg": "^8.11.0",
     "@types/ws": "^8.18.2",
-    "tsup": "^8.5.0"
+    "tsup": "^8.5.0",
+    "@pantau/agent": "workspace:*"
   }
 }

@@ -1,0 +1,32 @@
+{
+  "name": "@pantau/agent",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "bin": {
+    "pantau-agent": "./dist/main.js"
+  },
+  "scripts": {
+    "start": "tsx src/main.ts run",
+    "typecheck": "tsc -p tsconfig.json",
+    "build": "tsup"
+  },
+  "dependencies": {
+    "@pantau/adapters": "workspace:*",
+    "@pantau/contracts": "workspace:*",
+    "onvif": "1.0.0-rc.3",
+    "pino": "^10.3.1",
+    "undici": "^7.30.0",
+    "ws": "^8.22.0",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.2",
+    "tsup": "^8.5.0"
+  }
+}
