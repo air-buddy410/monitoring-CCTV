@@ -34,6 +34,6 @@ export async function withTenant<T>(db: Db, orgId: string, fn: (tx: Tx) => Promi
   });
 }
 
-export function newId(prefix: "site" | "dev" | "cam" | "aud"): string {
+export function newId(prefix: "site" | "dev" | "cam" | "aud" | "grt" | "agt" | "enr"): string {
   return `${prefix}_${randomUUID().replaceAll("-", "")}`;
 }

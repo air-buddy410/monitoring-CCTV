@@ -32,6 +32,14 @@ describe("role matrix (owner / operator / viewer)", () => {
     const body = add.json() as { device: { id: string }; cameras: { id: string }[] };
     deviceId = body.device.id;
     cameraId = body.cameras[0]?.id ?? "";
+    // Grants narrow video access (default deny for operator and viewer), so the operator is granted this camera.
+    const granted = await env.built.app.inject({
+      method: "POST",
+      url: "/v1/grants",
+      headers: { cookie: owner.cookie },
+      payload: { userId: operator.userId, scope: "camera", scopeId: cameraId, permission: "operate" },
+    });
+    expect(granted.statusCode).toBe(201);
   });
   afterAll(async () => env.close());
 

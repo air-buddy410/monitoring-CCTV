@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import { Writable } from "node:stream";
 import { type MockOnvif, type MockOnvifOptions, startMockOnvif } from "@pantau/mock-onvif";
 import pg from "pg";
@@ -120,7 +120,7 @@ export async function addMemberWithRole(
   env: TestEnv,
   org: Tenant,
   label: string,
-  role: "admin" | "member",
+  role: "admin" | "member" | "noc",
 ): Promise<Tenant> {
   const other = await createTenant(env, label);
   await env.admin.query(
@@ -135,6 +135,22 @@ export async function addMemberWithRole(
   });
   if (setActive.statusCode !== 200) throw new Error(`set-active failed ${setActive.statusCode}`);
   return { ...other, orgId: org.orgId };
+}
+
+/** RFC 6238 TOTP (SHA-1, 6 digits, 30 s) from an otpauth URI, as an authenticator app would compute it. */
+export function totpFromUri(uri: string, atMs = Date.now()): string {
+  const secret = new URL(uri).searchParams.get("secret") ?? "";
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = "";
+  for (const ch of secret.replace(/=+$/, "").toUpperCase())
+    bits += alphabet.indexOf(ch).toString(2).padStart(5, "0");
+  const bytes = Buffer.from(bits.match(/.{8}/g)?.map((b) => Number.parseInt(b, 2)) ?? []);
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(atMs / 30_000)));
+  const h = createHmac("sha1", bytes).update(counter).digest();
+  const off = (h[h.length - 1] as number) & 0xf;
+  const code = (h.readUInt32BE(off) & 0x7fffffff) % 1_000_000;
+  return code.toString().padStart(6, "0");
 }
 
 export async function createSite(env: TestEnv, t: Tenant, name = "Site Dummy") {

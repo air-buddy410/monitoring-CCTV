@@ -13,8 +13,10 @@ import type { Config } from "./config";
 import { AppError, rateLimited } from "./errors";
 import { createLogger } from "./logger";
 import { createRateLimiter, type RateLimiter } from "./rate-limit";
+import { createReadiness, type Readiness } from "./readiness";
 import { auditRoutes } from "./routes/audit";
 import { deviceRoutes } from "./routes/devices";
+import { grantRoutes } from "./routes/grants";
 import { healthRoutes } from "./routes/health";
 import { siteRoutes } from "./routes/sites";
 import { snapshotRoutes } from "./routes/snapshot";
@@ -27,10 +29,13 @@ export interface Deps {
   vault: Vault;
   resolveTenant: ReturnType<typeof createTenantResolver>;
   limiter: RateLimiter;
+  readiness: Readiness;
 }
 export interface BuiltApp {
   app: FastifyInstance;
   auth: ReturnType<typeof createAuth>;
+  handle: DbHandle;
+  readiness: Readiness;
   close(): Promise<void>;
 }
 export type { Role };
@@ -38,7 +43,7 @@ export type { Role };
 const PROBLEM = "application/problem+json";
 // endpoints that verify or set a password: throttled per client address and per account
 const CREDENTIAL_PATHS =
-  /^\/api\/auth\/(sign-in|sign-up|forget-password|reset-password|change-password)(\/|$)/;
+  /^\/api\/auth\/(sign-in|sign-up|forget-password|reset-password|change-password|two-factor\/(verify-totp|verify-backup-code|verify-otp|enable|disable))(\/|$)/;
 
 export async function buildApp(opts: {
   config: Config;
@@ -77,6 +82,7 @@ export async function buildApp(opts: {
         { name: "health" },
         { name: "sites" },
         { name: "devices" },
+        { name: "grants" },
         { name: "cameras" },
         { name: "audit" },
       ],
@@ -173,18 +179,29 @@ export async function buildApp(opts: {
     },
   });
 
-  const deps: Deps = { config, handle, vault, limiter, resolveTenant: createTenantResolver(auth, handle.db) };
+  const readiness = createReadiness(config.readinessTimeoutMs);
+  const deps: Deps = {
+    config,
+    handle,
+    vault,
+    limiter,
+    readiness,
+    resolveTenant: createTenantResolver(auth, handle.db),
+  };
   app.get("/docs/json", { schema: { hide: true } }, async () => app.swagger());
   healthRoutes(app, deps);
   siteRoutes(app, deps);
   deviceRoutes(app, deps);
   snapshotRoutes(app, deps);
+  grantRoutes(app, deps);
   auditRoutes(app, deps);
 
   app.withTypeProvider<ZodTypeProvider>();
   return {
     app,
     auth,
+    handle,
+    readiness,
     async close() {
       await app.close();
       await handle.close();
