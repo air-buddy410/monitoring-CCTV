@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import { loadDemoFrames, type MockOnvif, type MockOnvifOptions, startMockOnvif } from "@pantau/mock-onvif";
 import { type BrowserContext, expect, type Page } from "@playwright/test";
 import pg from "pg";
@@ -88,6 +88,68 @@ export async function newMember(tenant: Tenant, label: string, role: "admin" | "
     body: JSON.stringify({ organizationId: tenant.orgId }),
   });
   return { ...u, orgId: tenant.orgId };
+}
+
+const B32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+/** Decode RFC 4648 base32 (no padding needed) into bytes. */
+function base32Decode(input: string): Buffer {
+  let bits = 0;
+  let value = 0;
+  const out: number[] = [];
+  for (const ch of input.replace(/=+$/, "").toUpperCase()) {
+    const idx = B32.indexOf(ch);
+    if (idx === -1) continue;
+    value = (value << 5) | idx;
+    bits += 5;
+    if (bits >= 8) {
+      bits -= 8;
+      out.push((value >>> bits) & 0xff);
+    }
+  }
+  return Buffer.from(out);
+}
+
+/** RFC 6238 TOTP (HMAC-SHA1, 6 digits, 30s) for a raw secret string. */
+export function totp(secret: string, at = Date.now()): string {
+  const counter = Math.floor(at / 1000 / 30);
+  const buf = Buffer.alloc(8);
+  buf.writeBigUInt64BE(BigInt(counter));
+  const mac = createHmac("sha1", Buffer.from(secret, "utf8")).update(buf).digest();
+  const offset = (mac.at(-1) ?? 0) & 0x0f;
+  const bin =
+    (((mac[offset] ?? 0) & 0x7f) << 24) |
+    (((mac[offset + 1] ?? 0) & 0xff) << 16) |
+    (((mac[offset + 2] ?? 0) & 0xff) << 8) |
+    ((mac[offset + 3] ?? 0) & 0xff);
+  return (bin % 1_000_000).toString().padStart(6, "0");
+}
+
+/**
+ * Enable 2FA for a tenant through the real API and return the raw TOTP secret
+ * (decrypted with the E2E AUTH_SECRET) so the test can act as the authenticator app.
+ */
+export async function enableTwoFactor(t: Tenant, password = USER_PASSWORD): Promise<string> {
+  const res = await fetch(`${API}/api/auth/two-factor/enable`, {
+    method: "POST",
+    headers: { ...json, cookie: cookieHeader(t.cookie) },
+    body: JSON.stringify({ password }),
+  });
+  if (!res.ok) throw new Error(`enable 2fa failed ${res.status}: ${await res.text()}`);
+  const { totpURI } = (await res.json()) as { totpURI: string };
+  const uri = new URL(totpURI.replace(/^otpauth:\/\//, "https://"));
+  const secretB32 = uri.searchParams.get("secret");
+  if (!secretB32) throw new Error("no secret in totpURI");
+  // The provisioning URI carries the secret base32-encoded; decoding yields the raw secret
+  // (the same value the server encrypts at rest), so this acts exactly like an authenticator app.
+  const secret = base32Decode(secretB32).toString("utf8");
+  // Better Auth only flips twoFactorEnabled once a first code is verified while signed in.
+  const verify = await fetch(`${API}/api/auth/two-factor/verify-totp`, {
+    method: "POST",
+    headers: { ...json, cookie: cookieHeader(t.cookie) },
+    body: JSON.stringify({ code: totp(secret) }),
+  });
+  if (!verify.ok) throw new Error(`verify 2fa failed ${verify.status}: ${await verify.text()}`);
+  return secret;
 }
 
 export async function signInAs(context: BrowserContext, t: Tenant) {
