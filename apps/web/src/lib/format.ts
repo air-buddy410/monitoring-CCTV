@@ -34,6 +34,22 @@ export const AUDIT_LABEL: Record<string, string> = {
   "camera.snapshot": "Snapshot diambil",
   "camera.snapshot.failed": "Snapshot gagal",
   "site.create": "Lokasi dibuat",
+  "site.update": "Lokasi diubah",
+  "site.delete": "Lokasi dihapus",
+  "camera.update": "Kamera diubah",
+  "camera.snapshot.denied": "Snapshot ditolak (akses)",
+  "camera.view.start": "Tontonan dimulai",
+  "camera.view.stop": "Tontonan berhenti",
+  "camera.ptz": "Perintah PTZ",
+  "camera.playback.start": "Putar ulang dimulai",
+  "camera.playback.stop": "Putar ulang berhenti",
+  "grant.create": "Akses diberikan",
+  "grant.delete": "Akses dicabut",
+  "agent.enrollment.create": "Token pendaftaran agen dibuat",
+  "agent.enroll": "Agen terdaftar",
+  "agent.enroll.failed": "Pendaftaran agen gagal",
+  "agent.revoke": "Agen dicabut",
+  "agent.inventory.sync": "Inventaris agen disinkronkan",
 };
 
 export const REASON_LABEL: Record<string, string> = {
@@ -48,6 +64,8 @@ export const REASON_LABEL: Record<string, string> = {
   snapshot_uri_host_mismatch: "alamat snapshot di host lain",
   snapshot_uri_port_not_allowed: "port snapshot tidak diizinkan",
   snapshot_failed: "pengambilan gagal",
+  no_grant: "tidak ada akses ke kamera ini",
+  view_only: "akses hanya melihat, bukan operasi",
 };
 
 /** Only same-site relative paths may be used as a post-login destination. */

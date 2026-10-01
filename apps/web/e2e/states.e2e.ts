@@ -1,5 +1,16 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
-import { closeDb, newTenant, seedDevice, signInAs, startMock } from "./support";
+import {
+  closeDb,
+  enableTotpViaApi,
+  grantAccess,
+  loginUi,
+  newMember,
+  newTenant,
+  seedDevice,
+  signInAs,
+  startMock,
+  USER_PASSWORD,
+} from "./support";
 
 test.afterAll(closeDb);
 
@@ -105,6 +116,114 @@ for (const scheme of SCHEMES) {
       await expect(page.getByRole("dialog", { name: "Tambah perangkat" })).toBeVisible();
       await auditStates(page, `dialog tambah ${width} ${scheme}`);
 
+      await mock.stop();
+      await context.close();
+    });
+  }
+}
+
+for (const scheme of SCHEMES) {
+  test(`tombol primer: tidak ada frame berkontras rendah saat berganti nonaktif ke aktif: tema ${scheme}`, async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ colorScheme: scheme, locale: "id-ID" });
+    const page = await context.newPage();
+    // Hold the sign-in request so the button stays disabled for many frames, then answer with a refusal.
+    await page.route("**/api/auth/sign-in/email", async (route) => {
+      await new Promise((r) => setTimeout(r, 500));
+      await route.fulfill({
+        status: 401,
+        contentType: "application/json",
+        body: JSON.stringify({ code: "INVALID_EMAIL_OR_PASSWORD", message: "x" }),
+      });
+    });
+    await page.goto("/login");
+    await page.getByLabel("Email").fill("frame@example.test");
+    await page.getByLabel("Kata sandi").fill("Dummy-Frame-Pw-1234");
+    // Sample every animation frame from before the click until well after the button is enabled again.
+    await page.evaluate(() => {
+      const w = window as unknown as { __frames: { ratio: number; disabled: boolean }[]; __stop: boolean };
+      w.__frames = [];
+      w.__stop = false;
+      const parse = (c: string) => (c.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
+      const lin = (v: number) => {
+        const c = v / 255;
+        return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+      };
+      const lum = (c: number[]) =>
+        0.2126 * lin(c[0] as number) + 0.7152 * lin(c[1] as number) + 0.0722 * lin(c[2] as number);
+      const tick = () => {
+        const b = document.querySelector<HTMLButtonElement>("form button[type=submit]");
+        if (b) {
+          const cs = getComputedStyle(b);
+          const [hi, lo] = [lum(parse(cs.color)), lum(parse(cs.backgroundColor))].sort((a, c) => c - a) as [
+            number,
+            number,
+          ];
+          w.__frames.push({ ratio: (hi + 0.05) / (lo + 0.05), disabled: b.disabled });
+        }
+        if (!w.__stop) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    await page.getByRole("button", { name: "Masuk", exact: true }).click();
+    await expect(page.getByText("Email atau kata sandi salah.")).toBeVisible();
+    await page.waitForTimeout(300);
+    const frames = await page.evaluate(() => {
+      const w = window as unknown as { __frames: { ratio: number; disabled: boolean }[]; __stop: boolean };
+      w.__stop = true;
+      return w.__frames;
+    });
+    expect(
+      frames.some((f) => f.disabled),
+      "the disabled phase was never sampled",
+    ).toBe(true);
+    expect(frames.length).toBeGreaterThan(20);
+    const worst = Math.min(...frames.map((f) => f.ratio));
+    expect(worst, `lowest contrast over ${frames.length} frames`).toBeGreaterThanOrEqual(4.5);
+    await context.close();
+  });
+}
+
+for (const scheme of SCHEMES) {
+  for (const width of WIDTHS) {
+    test(`kontras tombol di Keamanan, Akses, dan langkah 2FA: ${width}px tema ${scheme}`, async ({
+      browser,
+    }) => {
+      const context = await browser.newContext({
+        viewport: { width, height: 900 },
+        colorScheme: scheme,
+        locale: "id-ID",
+      });
+      const page = await context.newPage();
+      const mock = await startMock({ channels: 2 });
+      const owner = await newTenant(`sx${width}${scheme}`);
+      const operator = await newMember(owner, "sxop", "admin");
+      const { cameras } = await seedDevice(owner, mock);
+      await grantAccess(owner, operator.userId, "camera", cameras[0]?.id as string, "operate");
+
+      const guarded = await newTenant(`sxg${width}${scheme}`);
+      await enableTotpViaApi(guarded);
+      await loginUi(page, guarded.email);
+      await expect(page.getByRole("heading", { name: "Verifikasi dua langkah", exact: true })).toBeVisible();
+      await auditStates(page, `langkah 2FA ${width} ${scheme}`);
+
+      await context.clearCookies();
+      await signInAs(context, owner);
+      await page.goto("/keamanan");
+      await expect(page.getByRole("heading", { name: "Keamanan akun" })).toBeVisible();
+      await auditStates(page, `keamanan mati ${width} ${scheme}`);
+      await page.getByLabel("Kata sandi akun, untuk memulai").fill(USER_PASSWORD);
+      await page.getByRole("button", { name: "Mulai aktifkan" }).click();
+      await expect(page.getByRole("img", { name: "Kode QR untuk aplikasi autentikator" })).toBeVisible();
+      await auditStates(page, `keamanan setup ${width} ${scheme}`);
+
+      await page.goto("/akses");
+      await expect(page.getByRole("button", { name: /^Cabut akses/ }).first()).toBeVisible();
+      await auditStates(page, `akses pemilik ${width} ${scheme}`);
+      await page.getByRole("button", { name: "Beri akses" }).click();
+      await expect(page.getByRole("dialog", { name: "Beri akses" })).toBeVisible();
+      await auditStates(page, `dialog beri akses ${width} ${scheme}`);
       await mock.stop();
       await context.close();
     });

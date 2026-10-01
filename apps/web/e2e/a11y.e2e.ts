@@ -85,6 +85,12 @@ for (const scheme of SCHEMES) {
     await page.goto("/organisasi");
     await expect(page.getByRole("heading", { name: "Pilih organisasi" })).toBeVisible();
     await auditFocus(page, `organisasi ${scheme}`);
+    await page.goto("/akses");
+    await expect(page.getByRole("heading", { name: "Akses kamera" })).toBeVisible();
+    await auditFocus(page, `akses ${scheme}`);
+    await page.goto("/keamanan");
+    await expect(page.getByRole("heading", { name: "Keamanan akun" })).toBeVisible();
+    await auditFocus(page, `keamanan ${scheme}`);
     await mock.stop();
     await context.close();
   });
@@ -109,7 +115,14 @@ for (const scheme of SCHEMES) {
     await expect(page.getByRole("heading", { name: "Masuk" })).toBeVisible();
     expect(await overflow(), "login overflows at 320").toBeLessThanOrEqual(0);
     await signInAs(context, t);
-    for (const path of [`/perangkat?d=${device.id}`, "/perangkat", "/audit", "/organisasi"]) {
+    for (const path of [
+      `/perangkat?d=${device.id}`,
+      "/perangkat",
+      "/audit",
+      "/organisasi",
+      "/akses",
+      "/keamanan",
+    ]) {
       await page.goto(path);
       await page.waitForLoadState("networkidle");
       expect(await overflow(), `${path} overflows at 320`).toBeLessThanOrEqual(0);

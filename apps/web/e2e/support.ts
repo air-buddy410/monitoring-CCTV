@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import { loadDemoFrames, type MockOnvif, type MockOnvifOptions, startMockOnvif } from "@pantau/mock-onvif";
 import { type BrowserContext, expect, type Page } from "@playwright/test";
 import pg from "pg";
@@ -76,7 +76,11 @@ export async function newTenant(label: string): Promise<Tenant> {
 }
 
 /** A second user who is a member of `tenant`'s organization with the given Better Auth role. */
-export async function newMember(tenant: Tenant, label: string, role: "admin" | "member"): Promise<Tenant> {
+export async function newMember(
+  tenant: Tenant,
+  label: string,
+  role: "admin" | "member" | "noc",
+): Promise<Tenant> {
   const u = await newUser(label);
   await db().query(
     `insert into "member" (id, organization_id, user_id, role, created_at) values ($1,$2,$3,$4, now())`,
@@ -205,4 +209,55 @@ export async function addOrg(t: Tenant, name: string): Promise<string> {
   });
   if (!res.ok) throw new Error(`org create failed ${res.status}`);
   return ((await res.json()) as { id: string }).id;
+}
+
+/** RFC 6238 code (SHA-1, 6 digits, 30 s) from the base32 key an authenticator app is given. */
+export function totpFromBase32(secret: string, atMs = Date.now()): string {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = "";
+  for (const ch of secret.replace(/[\s=]/g, "").toUpperCase())
+    bits += alphabet.indexOf(ch).toString(2).padStart(5, "0");
+  const key = Buffer.from(bits.match(/.{8}/g)?.map((b) => Number.parseInt(b, 2)) ?? []);
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(atMs / 30_000)));
+  const h = createHmac("sha1", key).update(counter).digest();
+  const off = (h[h.length - 1] as number) & 0xf;
+  return ((h.readUInt32BE(off) & 0x7fffffff) % 1_000_000).toString().padStart(6, "0");
+}
+
+/** Arrange a grant through the real API as the tenant owner. */
+export async function grantAccess(
+  owner: Tenant,
+  userId: string,
+  scope: "site" | "camera",
+  scopeId: string,
+  permission: "view" | "operate",
+) {
+  const res = await fetch(`${API}/v1/grants`, {
+    method: "POST",
+    headers: { ...json, cookie: cookieHeader(owner.cookie) },
+    body: JSON.stringify({ userId, scope, scopeId, permission }),
+  });
+  if (res.status !== 201) throw new Error(`grant failed ${res.status}: ${await res.text()}`);
+  return (await res.json()) as { id: string };
+}
+
+/** Turn on TOTP for a tenant's user through the real API (arranging state; the UI path is covered separately). */
+export async function enableTotpViaApi(t: Tenant): Promise<{ secret: string; backup: string[] }> {
+  const headers = { ...json, cookie: cookieHeader(t.cookie) };
+  const en = await fetch(`${API}/api/auth/two-factor/enable`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ password: USER_PASSWORD }),
+  });
+  if (!en.ok) throw new Error(`2fa enable failed ${en.status}`);
+  const body = (await en.json()) as { totpURI: string; backupCodes: string[] };
+  const secret = new URL(body.totpURI).searchParams.get("secret") as string;
+  const ver = await fetch(`${API}/api/auth/two-factor/verify-totp`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ code: totpFromBase32(secret) }),
+  });
+  if (!ver.ok) throw new Error(`2fa verify failed ${ver.status}`);
+  return { secret, backup: body.backupCodes };
 }
